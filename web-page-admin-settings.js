@@ -21,6 +21,10 @@ export default {
 
         <label for="s-welcome">Bot welcome message (sent on /start)</label>
         <textarea id="s-welcome" maxlength="1000">${esc(s.welcome_text)}</textarea>
+
+        <label for="s-welcome-photo">Welcome photo URL (optional)</label>
+        <input id="s-welcome-photo" type="url" placeholder="https://example.com/welcome.jpg" value="${esc(s.welcome_photo_url || '')}">
+        <p class="hint">If set, /start sends this photo with the welcome message as its caption. Leave empty to send text only. The image URL must be publicly accessible over HTTPS.</p>
       </div>
 
       <div class="card">
@@ -52,6 +56,7 @@ export default {
           min_withdraw: el.querySelector("#s-min").value,
           max_withdraw: el.querySelector("#s-max").value,
           welcome_text: el.querySelector("#s-welcome").value,
+          welcome_photo_url: el.querySelector("#s-welcome-photo").value,
           auto_payout: el.querySelector("#s-auto").checked,
           payout_api_url: el.querySelector("#s-url").value,
           payout_api_key: el.querySelector("#s-key").value,

@@ -161,9 +161,31 @@ router.post('/wallet', wrap(async (req, res) => {
   res.json({ wallet_address: r.rows[0].wallet_address });
 }));
 
+router.get('/withdrawals/:id/status', wrap(async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) throw new HttpError(404, 'Withdrawal not found.');
+  const { rows } = await pool.query(
+    `SELECT id, amount, address, status, payout_state, tx_hash, note, created_at
+       FROM withdrawals WHERE id = $1 AND user_id = $2`,
+    [id, req.user.id]
+  );
+  if (!rows.length) throw new HttpError(404, 'Withdrawal not found.');
+  const w = rows[0];
+  res.json({
+    id: w.id,
+    amount: Number(w.amount),
+    address: w.address,
+    status: w.status,
+    payout_state: w.payout_state,
+    tx_hash: w.tx_hash || null,
+    note: w.note || null,
+    created_at: w.created_at
+  });
+}));
+
 router.post('/withdrawals', wrap(async (req, res) => {
   const result = await svc.createWithdrawal(req.user, (req.body || {}).amount);
-  res.json({ ok: true, balance: result.balance, auto: result.auto });
+  res.json({ ok: true, id: result.id, balance: result.balance, auto: result.auto });
 }));
 
 module.exports = router;

@@ -60,6 +60,11 @@ router.put('/settings', wrap(async (req, res) => {
   const welcome_text = String(b.welcome_text || '').trim().slice(0, 1000);
   if (!welcome_text) throw new HttpError(400, 'The welcome message cannot be empty.');
 
+  const welcome_photo_url = String(b.welcome_photo_url || '').trim().slice(0, 1000);
+  if (welcome_photo_url && !/^https:\/\/\S+$/i.test(welcome_photo_url)) {
+    throw new HttpError(400, 'The welcome photo URL must start with https://');
+  }
+
   const auto_payout = b.auto_payout === true || b.auto_payout === 'true';
   const payout_api_url = String(b.payout_api_url || '').trim();
   if (!/^https:\/\/\S+$/i.test(payout_api_url)) throw new HttpError(400, 'The payout API address must start with https://');
@@ -75,7 +80,7 @@ router.put('/settings', wrap(async (req, res) => {
   if (auto_payout && !payout_token_address) throw new HttpError(400, 'Add the token address before turning on auto payout.');
 
   const toSave = {
-    referral_reward, min_withdraw, max_withdraw, welcome_text,
+    referral_reward, min_withdraw, max_withdraw, welcome_text, welcome_photo_url,
     auto_payout: String(auto_payout), payout_api_url, payout_token_address
   };
   if (newKey) toSave.payout_api_key = newKey; // leaving it empty keeps the saved key

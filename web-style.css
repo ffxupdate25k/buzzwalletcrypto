@@ -31,3 +31,39 @@ input:not([type=checkbox]),textarea,select{width:100%;border:1px solid var(--lin
 #blocked{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;background:radial-gradient(circle at 20% 10%,rgba(124,92,255,.4),transparent 35%),linear-gradient(160deg,#090d1a,#0a1020);color:#fff}#blocked .box{background:rgba(17,25,44,.94);color:var(--text);border:1px solid var(--line);border-radius:28px;padding:34px 24px;max-width:360px;box-shadow:0 24px 70px rgba(0,0,0,.45)}#blocked .lock{width:72px;height:72px;margin:0 auto 18px;border-radius:24px;background:rgba(124,92,255,.15);display:flex;align-items:center;justify-content:center}#blocked .lock svg{width:36px;height:36px;stroke:#9e8cff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}#blocked h2{margin-bottom:8px}#blocked p{color:var(--muted);font-size:14px;line-height:1.5}
 
 .broadcast-button{padding:9px;border:1px solid var(--line);background:rgba(255,255,255,.025);border-radius:14px;margin-bottom:7px}
+
+/* Withdrawal receipt / payout progress */
+.withdrawal-receipt-page{background:#fff;color:#17202f;min-height:100vh}
+.withdrawal-receipt-top{height:76px;padding:18px 18px 10px;display:flex;align-items:center;justify-content:center;position:relative;background:#fff;border-bottom:1px solid #edf0f3}
+.withdrawal-receipt-top h1{font-size:21px;letter-spacing:-.4px;color:#101722}
+.receipt-back{position:absolute;left:14px;top:18px;width:42px;height:42px;border:0;background:transparent;color:#111;font-size:34px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.receipt-body{padding:16px;background:#fff;min-height:calc(100vh - 76px)}
+.receipt-card{background:#fff;border:1px solid #eef1f4;border-radius:22px;padding:24px 16px 20px;box-shadow:0 10px 35px rgba(20,30,45,.06);text-align:center;max-width:520px;margin:0 auto}
+.receipt-check{width:104px;height:104px;border-radius:50%;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:900;background:#eafaf2;color:#19b96b;position:relative}
+.receipt-check.done:after{content:"";position:absolute;inset:8px;border-radius:50%;border:2px solid rgba(25,185,107,.16)}
+.receipt-check.loading{background:#f1faf5}
+.receipt-check.loading:after{content:"";width:42px;height:42px;border-radius:50%;border:4px solid #d8f2e5;border-top-color:#18b968;animation:receiptSpin .8s linear infinite}
+.receipt-check.error{background:#fff0f2;color:#ef4f68}
+@keyframes receiptSpin{to{transform:rotate(360deg)}}
+.receipt-label{font-size:18px;color:#8b949f;font-weight:700;margin-top:4px}
+.receipt-amount{font-size:35px;font-weight:900;letter-spacing:-1px;color:#141a23;margin:5px 0 12px}
+.receipt-status{display:inline-flex;align-items:center;justify-content:center;padding:8px 17px;border-radius:999px;font-size:12px;font-weight:900;letter-spacing:.7px}
+.receipt-status.done{background:#e7f9ef;color:#18a963}.receipt-status.pending{background:#edf9f2;color:#1baa67}.receipt-status.error{background:#fff0f2;color:#e64d65}
+.receipt-message{font-size:14px;line-height:1.55;color:#8a939d;margin:15px auto 24px;max-width:410px}
+.withdraw-steps{display:flex;align-items:flex-start;justify-content:center;width:100%;margin:8px 0 25px;padding:0 4px}
+.withdraw-step{width:31%;min-width:78px;position:relative;text-align:center}
+.step-dot{width:48px;height:48px;margin:0 auto 9px;border-radius:50%;background:#edf0f2;color:#b2bac2;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:900;border:3px solid #fff;box-shadow:0 2px 0 1px #e7eaed;transition:all .3s ease}
+.withdraw-step.active .step-dot{background:#20c476;color:#fff;box-shadow:0 0 0 5px rgba(32,196,118,.12);animation:pulseReceipt 1.2s ease-in-out infinite}
+.withdraw-step.complete .step-dot{background:#20c476;color:#fff;box-shadow:0 0 0 3px rgba(32,196,118,.1)}
+.withdraw-step.failed .step-dot{background:#ed556d;color:#fff;box-shadow:0 0 0 4px rgba(237,85,109,.1)}
+.step-copy b{display:block;font-size:12px;line-height:1.25;color:#1d2630;font-weight:850}
+.step-copy small{display:block;color:#a0a8b0;font-size:9px;line-height:1.35;margin-top:4px}
+.step-line{height:4px;flex:1;margin:23px -1px 0;background:#e6e9ec;border-radius:999px;overflow:hidden;position:relative}
+.step-line span{display:block;height:100%;width:0;background:#20c476;border-radius:999px;transition:width .5s ease}
+.step-line.complete span{width:100%}
+@keyframes pulseReceipt{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.receipt-destination,.receipt-tx{display:flex;justify-content:space-between;gap:12px;text-align:left;padding:13px 14px;border-radius:14px;background:#f5fbf7;border:1px solid #e3f4e9;margin-top:10px;color:#66717b;font-size:12px}
+.receipt-destination b{color:#1d2a24}.receipt-tx{display:block}.receipt-tx span{display:block;margin-bottom:5px}.receipt-tx b{display:block;color:#1d2a24;font-size:11px;overflow-wrap:anywhere}
+.receipt-card .btn{margin-top:16px;background:#20b96f;box-shadow:0 10px 24px rgba(32,185,111,.18)}
+.receipt-card .btn.ghost{background:#f1f4f5;color:#3d4650;box-shadow:none;border-color:#e1e5e8}
+@media(max-width:360px){.receipt-card{padding-left:10px;padding-right:10px}.step-dot{width:42px;height:42px}.step-copy b{font-size:10px}.step-copy small{font-size:8px}.receipt-amount{font-size:31px}}

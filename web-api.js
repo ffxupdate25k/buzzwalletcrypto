@@ -38,6 +38,7 @@ export const api = {
   startTask:         (id)      => post(`/api/tasks/${id}/start`),
   saveWallet:        (address) => post("/api/wallet", { address }),
   requestWithdrawal: (payload) => post("/api/withdrawals", payload),
+  getWithdrawalStatus: (id) => http(`/api/withdrawals/${id}/status`),
 
   admin: {
     overview:          ()          => http("/api/admin/overview"),

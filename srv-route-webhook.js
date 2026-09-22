@@ -29,7 +29,14 @@ async function handleUpdate(u) {
   const extra = PUBLIC_URL
     ? { reply_markup: { inline_keyboard: [[{ text: 'Open Buzz Wallet', web_app: { url: PUBLIC_URL } }]] } }
     : {};
-  await tgApi.sendMessage(m.chat.id, s.welcome_text, extra);
+
+  // If the admin configured a welcome photo, send the /start message as a photo
+  // with the welcome text as its caption. Otherwise keep the normal text message.
+  if (s.welcome_photo_url) {
+    await tgApi.sendPhoto(m.chat.id, s.welcome_photo_url, s.welcome_text, extra);
+  } else {
+    await tgApi.sendMessage(m.chat.id, s.welcome_text, extra);
+  }
 }
 
 router.post('/webhook', express.json({ limit: '1mb' }), wrap(async (req, res) => {
