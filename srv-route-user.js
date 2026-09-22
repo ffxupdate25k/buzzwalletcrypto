@@ -22,13 +22,11 @@ router.use(requireGate);
 router.get('/me', wrap(async (req, res) => {
   const s = await getSettings();
   const r = await pool.query("SELECT COUNT(*) AS n FROM referrals WHERE referrer_id = $1 AND status = 'completed'", [req.user.id]);
-  const td = await pool.query("SELECT COUNT(*) AS n FROM task_submissions WHERE user_id = $1 AND status = 'approved'", [req.user.id]);
   res.json({
     id: req.user.id,
     name: svc.displayName(req.user),
     balance: req.user.balance,
     referrals: r.rows[0].n,
-    task_count: td.rows[0].n,
     is_admin: req.isAdmin,
     referral_link: `https://t.me/${state.bot.username}?start=ref_${req.user.id}`,
     wallet_address: req.user.wallet_address || null,
