@@ -1,0 +1,18 @@
+{
+  "name": "buzz-wallet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Buzz Wallet - Telegram Mini App with backend and admin panel",
+  "main": "srv-index.js",
+  "scripts": {
+    "start": "node srv-index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.11.5"
+  }
+}
