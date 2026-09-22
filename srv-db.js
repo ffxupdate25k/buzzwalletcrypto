@@ -142,12 +142,7 @@ ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_response TEXT;
 -- Timer-based tasks: instead of a screenshot, a per-task countdown (seconds) runs after the
 -- user opens the task link, and the reward is credited once enough time has genuinely passed.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS timer_seconds INT NOT NULL DEFAULT 10;
--- Catches 'screenshot' from the old version AND any other leftover/unexpected value,
--- including NULL (IS DISTINCT FROM treats NULL as a real value instead of "unknown",
--- unlike NOT IN, which silently skips NULL rows), so this constraint can never fail
--- to apply no matter what is already sitting in the tasks table.
-UPDATE tasks SET verify_type = 'timer'
-  WHERE verify_type IS DISTINCT FROM 'auto' AND verify_type IS DISTINCT FROM 'timer';
+UPDATE tasks SET verify_type = 'timer' WHERE verify_type = 'screenshot';
 ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_verify_type_check;
 ALTER TABLE tasks ADD CONSTRAINT tasks_verify_type_check CHECK (verify_type IN ('auto','timer'));
 `;
