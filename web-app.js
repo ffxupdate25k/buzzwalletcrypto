@@ -51,6 +51,7 @@ function boot() {
     name === "home" ? backButton.hide() : backButton.show();
     try {
       await page.render(app, { go });
+      renderBottomNav();
     } catch (err) {
       if (err.gate) return enter(); // user left a required channel: show the gate again
       app.innerHTML = `<div class="empty">Couldn't load this page.<br>${esc(err.message)}</div>`;
@@ -81,6 +82,27 @@ function boot() {
       refreshBusy = false;
     }
   }
+  function renderBottomNav() {
+    app.querySelector(".bottom-nav")?.remove();
+    if (currentName === "admin") return;
+    const items = [
+      ["home", "Home", "<svg viewBox=\"0 0 24 24\"><path d=\"M3 10.5 12 3l9 7.5\"/><path d=\"M5 9v11h14V9\"/><path d=\"M9 20v-6h6v6\"/></svg>"],
+      ["task", "Tasks", "<svg viewBox=\"0 0 24 24\"><rect x=\"4\" y=\"4\" width=\"16\" height=\"16\" rx=\"3\"/><path d=\"m8 12 3 3 5-6\"/></svg>"],
+      ["referral", "Referrals", "<svg viewBox=\"0 0 24 24\"><circle cx=\"9\" cy=\"8\" r=\"3.5\"/><path d=\"M2 20c0-3.6 3-6 7-6s7 2.4 7 6\"/><path d=\"M19 8v6M16 11h6\"/></svg>"],
+      ["profile", "Profile", "<svg viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7\"/></svg>"]
+    ];
+    const nav = document.createElement("nav");
+    nav.className = "bottom-nav";
+    nav.innerHTML = items.map(([id,label,icon]) => `<button class=\"${currentName===id?"active":""}\" data-nav=\"${id}\">${icon}<span>${label}</span></button>`).join("");
+    nav.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-nav]");
+      if (!btn) return;
+      tap();
+      go(btn.dataset.nav);
+    });
+    app.appendChild(nav);
+  }
+
   let currentName = "home";
 
   backButton.onClick(() => go("home"));
