@@ -30,7 +30,6 @@ router.get('/me', wrap(async (req, res) => {
     is_admin: req.isAdmin,
     referral_link: `https://t.me/${state.bot.username}?start=ref_${req.user.id}`,
     wallet_address: req.user.wallet_address || null,
-    wc_project_id: s.wc_project_id || '',
     auto_payout: !!(s.auto_payout && s.payout_api_key && s.payout_token_address),
     referral_reward: s.referral_reward,
     min_withdraw: s.min_withdraw,
@@ -70,20 +69,28 @@ router.get('/referrals', wrap(async (req, res) => {
   });
 }));
 
-// Tasks with this user's progress. chat_id is never sent to users.
+// Tasks with this user's progress. chat_id is never sent to users. For a timer task the
+// user is currently waiting on, remaining_seconds tells the client how much longer to count.
 router.get('/tasks', wrap(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT t.id, t.title, t.description, t.reward, t.url, t.verify_type,
-            COALESCE((
-              SELECT CASE s.status WHEN 'approved' THEN 'done' WHEN 'pending' THEN 'pending' ELSE 'rejected' END
-                FROM task_submissions s
-               WHERE s.task_id = t.id AND s.user_id = $1
-               ORDER BY (s.status = 'approved') DESC, (s.status = 'pending') DESC, s.id DESC LIMIT 1
-            ), 'todo') AS status
-       FROM tasks t WHERE t.active ORDER BY t.id`,
+    `SELECT t.id, t.title, t.description, t.reward, t.url, t.verify_type, t.timer_seconds,
+            COALESCE(s.status, 'todo') AS raw_status,
+            GREATEST(0, t.timer_seconds - EXTRACT(EPOCH FROM (now() - s.created_at)))::int AS remaining_seconds
+       FROM tasks t
+       LEFT JOIN LATERAL (
+         SELECT status, created_at FROM task_submissions
+          WHERE task_id = t.id AND user_id = $1
+          ORDER BY (status = 'approved') DESC, (status = 'pending') DESC, id DESC LIMIT 1
+       ) s ON true
+      WHERE t.active ORDER BY t.id`,
     [req.user.id]
   );
-  res.json(rows);
+  res.json(rows.map((r) => ({
+    id: r.id, title: r.title, description: r.description, reward: r.reward, url: r.url,
+    verify_type: r.verify_type, timer_seconds: r.timer_seconds,
+    status: r.raw_status === 'approved' ? 'done' : r.raw_status === 'pending' ? 'pending' : 'todo',
+    remaining_seconds: r.raw_status === 'pending' ? r.remaining_seconds : null
+  })));
 }));
 
 async function getTask(idParam, verifyType) {
@@ -91,79 +98,66 @@ async function getTask(idParam, verifyType) {
   if (!id) throw new HttpError(404, 'Task not found.');
   const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1 AND active', [id]);
   if (!rows.length) throw new HttpError(404, 'Task not found.');
-  if (rows[0].verify_type !== verifyType) {
-    throw new HttpError(400, verifyType === 'auto' ? 'This task needs a screenshot.' : 'This task is checked automatically.');
-  }
+  if (rows[0].verify_type !== verifyType) throw new HttpError(400, 'This task is checked a different way. Reload the page.');
   return rows[0];
 }
 
+// Timer task, step 1: the user tapped "Start" and (usually) opened the task's link. This
+// starts the server-side clock; it's idempotent, so reopening the task never restarts it.
+router.post('/tasks/:id/start', wrap(async (req, res) => {
+  const task = await getTask(req.params.id, 'timer');
+  const startedAt = await svc.startTimerTask(task, req.user.id);
+  const remaining = Math.max(0, task.timer_seconds - Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+  res.json({ remaining_seconds: remaining });
+}));
+
 // Auto-verify: the bot checks that the user is a member of the task's channel/group.
 router.post('/tasks/:id/claim', wrap(async (req, res) => {
-  const task = await getTask(req.params.id, 'auto');
-  let member;
-  try {
-    member = await tgApi.getChatMember(task.chat_id, req.user.id);
-  } catch (e) {
-    console.error(`Verification failed for task ${task.id}:`, e.message);
-    throw new HttpError(503, "We couldn't check this task right now. Please try again later.");
-  }
-  const joined =
-    ['creator', 'administrator', 'member'].includes(member.status) ||
-    (member.status === 'restricted' && member.is_member);
-  if (!joined) throw new HttpError(400, "We couldn't find you there yet. Join first, then tap Verify again.");
+  const id = parseInt(req.params.id, 10);
+  if (!id) throw new HttpError(404, 'Task not found.');
+  const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1 AND active', [id]);
+  if (!rows.length) throw new HttpError(404, 'Task not found.');
+  const task = rows[0];
 
-  const balance = await svc.completeAutoTask(task, req.user.id);
+  let balance;
+  if (task.verify_type === 'auto') {
+    let member;
+    try {
+      member = await tgApi.getChatMember(task.chat_id, req.user.id);
+    } catch (e) {
+      console.error(`Verification failed for task ${task.id}:`, e.message);
+      throw new HttpError(503, "We couldn't check this task right now. Please try again later.");
+    }
+    const joined =
+      ['creator', 'administrator', 'member'].includes(member.status) ||
+      (member.status === 'restricted' && member.is_member);
+    if (!joined) throw new HttpError(400, "We couldn't find you there yet. Join first, then tap Verify again.");
+    balance = await svc.completeAutoTask(task, req.user.id);
+  } else {
+    balance = await svc.completeTimerTask(task, req.user.id);
+  }
   res.json({ reward: task.reward, balance });
 }));
 
-function parseImage(dataUrl) {
-  const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl || '');
-  if (!m) return null;
-  const buf = Buffer.from(m[2], 'base64');
-  if (buf.length < 100 || buf.length > 4 * 1024 * 1024) return null;
-  const png = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
-  const jpg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
-  const webp = buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP';
-  if (!png && !jpg && !webp) return null;
-  return { buf, mime: m[1] };
-}
-
-// Screenshot tasks: the image is stored and an admin approves or rejects it.
-router.post('/tasks/:id/submit', wrap(async (req, res) => {
-  const task = await getTask(req.params.id, 'screenshot');
-  const img = parseImage(req.body && req.body.image);
-  if (!img) throw new HttpError(400, 'Please send a clear PNG or JPG screenshot under 4 MB.');
-  try {
-    await pool.query(
-      `INSERT INTO task_submissions (task_id, user_id, status, image, mime) VALUES ($1, $2, 'pending', $3, $4)`,
-      [task.id, req.user.id, img.buf, img.mime]
-    );
-  } catch (e) {
-    if (e.code === '23505') throw new HttpError(409, 'You already sent this task.');
-    throw e;
-  }
-  svc.notifyAdmins(`📸 New screenshot from ${svc.displayName(req.user)} for "${task.title}". Open Admin panel > Proofs.`);
-  res.json({ status: 'pending' });
-}));
-
-// Saves the BEP20 address the user approved in Trust Wallet. It can only be set once.
+// Saves the USDT BEP20 wallet address the user typed. Can only be set once; an admin can
+// reset it in Users if the user made a mistake.
 router.post('/wallet', wrap(async (req, res) => {
-  const address = String((req.body || {}).address || '').trim();
+  const address = String((req.body || {}).address || '').trim().toLowerCase();
   if (!/^0x[a-fA-F0-9]{40}$/.test(address) || /^0x0{40}$/.test(address)) {
-    throw new HttpError(400, 'That is not a valid BEP20 wallet address.');
+    throw new HttpError(400, 'That is not a valid USDT BEP20 wallet address.');
   }
   let r;
   try {
     r = await pool.query(
       `UPDATE users SET wallet_address = $1, wallet_connected_at = now()
         WHERE id = $2 AND wallet_address IS NULL RETURNING wallet_address`,
-      [address.toLowerCase(), req.user.id]
+      [address, req.user.id]
     );
   } catch (e) {
-    if (e.code === '23505') throw new HttpError(409, 'This wallet is already linked to another account.');
+    if (e.code === '23505') throw new HttpError(409, 'This wallet address is already linked to another account.');
     throw e;
   }
-  if (!r.rowCount) throw new HttpError(409, 'Your wallet is already connected.');
+  if (!r.rowCount) throw new HttpError(409, 'Your wallet is already saved.');
   res.json({ wallet_address: r.rows[0].wallet_address });
 }));
 

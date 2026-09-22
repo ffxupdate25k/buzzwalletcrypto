@@ -38,13 +38,7 @@ export default {
         <label for="s-token">Token contract address (BEP20)</label>
         <input id="s-token" placeholder="0x..." value="${esc(s.payout_token_address)}">
         <p class="hint">The token users are paid in. Users' amounts are sent as this token.</p>
-      </div>
-
-      <div class="card">
-        <b>Wallet connection</b>
-        <label for="s-wc">WalletConnect Project ID</label>
-        <input id="s-wc" placeholder="Paste your Project ID" value="${esc(s.wc_project_id)}">
-        <p class="hint">Free at cloud.reown.com: create a project (type "App"), copy the Project ID. Without it users can't connect Trust Wallet. If connecting fails, add your app's web address to the project's allowed domains.</p>
+        <p class="hint">Users type their own USDT BEP20 address in the app — no wallet connection or screenshot needed.</p>
       </div>
 
       <button class="btn" id="save">Save settings</button>`;
@@ -61,8 +55,7 @@ export default {
           auto_payout: el.querySelector("#s-auto").checked,
           payout_api_url: el.querySelector("#s-url").value,
           payout_api_key: el.querySelector("#s-key").value,
-          payout_token_address: el.querySelector("#s-token").value,
-          wc_project_id: el.querySelector("#s-wc").value
+          payout_token_address: el.querySelector("#s-token").value
         });
         el.querySelector("#s-key").value = "";
         el.querySelector("#s-key").placeholder = saved.has_api_key ? "Saved (" + saved.api_key_hint + "). Leave empty to keep it" : "Paste your API key";

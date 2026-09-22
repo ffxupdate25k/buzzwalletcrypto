@@ -35,7 +35,7 @@ export const api = {
   getReferrals:      ()        => http("/api/referrals"),
   getTasks:          ()        => http("/api/tasks"),
   claimTask:         (id)      => post(`/api/tasks/${id}/claim`),
-  submitProof:       (id, img) => post(`/api/tasks/${id}/submit`, { image: img }),
+  startTask:         (id)      => post(`/api/tasks/${id}/start`),
   saveWallet:        (address) => post("/api/wallet", { address }),
   requestWithdrawal: (payload) => post("/api/withdrawals", payload),
 
@@ -53,15 +53,6 @@ export const api = {
     createTask:        (t)         => post("/api/admin/tasks", t),
     updateTask:        (id, t)     => http(`/api/admin/tasks/${id}`, "PUT", t),
     deleteTask:        (id)        => http(`/api/admin/tasks/${id}`, "DELETE"),
-
-    submissions:       ()          => http("/api/admin/submissions"),
-    approveSubmission: (id)        => post(`/api/admin/submissions/${id}/approve`),
-    rejectSubmission:  (id)        => post(`/api/admin/submissions/${id}/reject`),
-    async submissionImage(id) {
-      const res = await fetch(CONFIG.API_BASE + `/api/admin/submissions/${id}/image`, { headers: authHeader() });
-      if (!res.ok) throw new Error("Could not load the image.");
-      return res.blob();
-    },
 
     withdrawals:       (status)    => http(`/api/admin/withdrawals?status=${encodeURIComponent(status)}`),
     sendWithdrawal:    (id)        => post(`/api/admin/withdrawals/${id}/send`),

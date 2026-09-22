@@ -1,15 +1,24 @@
 import { api } from "./web-api.js";
 import { tap, haptic, notify, openAny } from "./web-telegram.js";
-import { esc, money, pageTop, fileToCompressedDataURL, fail } from "./web-utils.js";
+import { esc, money, pageTop, fail } from "./web-utils.js";
+
+// Active countdown timers, keyed by task id, so a re-render or reload never leaves two
+// timers running for the same task.
+const timers = new Map();
+function stopTimer(id) {
+  const t = timers.get(id);
+  if (t) { clearInterval(t); timers.delete(id); }
+}
 
 function actionsHTML(t) {
   if (t.status === "done") return `<span class="badge b-ok">Done</span>`;
-  if (t.status === "pending") return `<span class="badge b-pend">In review</span>`;
+  if (t.status === "pending") {
+    if (t.verify_type === "timer") return `<span class="badge b-pend" id="cd-${t.id}">Claiming in ${t.remaining_seconds}s…</span>`;
+    return `<span class="badge b-pend">In review</span>`;
+  }
   const open = t.url ? `<button class="btn sm ghost" data-act="open" data-id="${t.id}">Open</button>` : "";
-  const main = t.verify_type === "auto"
-    ? `<button class="btn sm" data-act="verify" data-id="${t.id}">Verify</button>`
-    : `<button class="btn sm" data-act="upload" data-id="${t.id}">${t.status === "rejected" ? "Send again" : "Upload screenshot"}</button>`;
-  return open + main;
+  if (t.verify_type === "auto") return open + `<button class="btn sm" data-act="verify" data-id="${t.id}">Verify</button>`;
+  return `<button class="btn sm" data-act="start" data-id="${t.id}">Start task</button>`;
 }
 
 function rowHTML(t) {
@@ -17,20 +26,8 @@ function rowHTML(t) {
     <div class="task">
       <div class="head"><b>${esc(t.title)}</b><span class="reward">+${money(t.reward)}</span></div>
       ${t.description ? `<p class="desc">${esc(t.description)}</p>` : ""}
-      ${t.status === "rejected" ? `<p class="note err">Your last screenshot was rejected. You can send a new one.</p>` : ""}
       <div class="acts">${actionsHTML(t)}</div>
     </div>`;
-}
-
-function pickImage() {
-  return new Promise((resolve) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = () => resolve(input.files && input.files[0] ? input.files[0] : null);
-    input.addEventListener("cancel", () => resolve(null));
-    input.click();
-  });
 }
 
 export default {
@@ -43,11 +40,39 @@ export default {
         <div class="body"><div class="card" id="list"></div></div>
       </section>`;
     const list = el.querySelector("#list");
+
     const draw = () => {
       list.innerHTML = tasks.length ? tasks.map(rowHTML).join("") : `<div class="empty">No tasks right now.<br>Check back soon.</div>`;
+      tasks.filter((t) => t.status === "pending" && t.verify_type === "timer").forEach(startCountdown);
     };
-    const reload = async () => { tasks = await api.getTasks(); draw(); };
+    const reload = async () => { tasks.forEach((t) => stopTimer(t.id)); tasks = await api.getTasks(); draw(); };
     draw();
+
+    // Ticks a task's badge down to 0, then claims the reward automatically.
+    function startCountdown(t) {
+      stopTimer(t.id);
+      let remaining = t.remaining_seconds;
+      const badge = () => list.querySelector(`#cd-${t.id}`);
+      timers.set(t.id, setInterval(async () => {
+        remaining -= 1;
+        const el2 = badge();
+        if (remaining > 0) {
+          if (el2) el2.textContent = `Claiming in ${remaining}s…`;
+          return;
+        }
+        stopTimer(t.id);
+        if (el2) el2.textContent = "Claiming…";
+        try {
+          const r = await api.claimTask(t.id);
+          haptic("success");
+          notify(`Task complete! You earned ${money(r.reward)}.`);
+          reload();
+        } catch (err) {
+          fail(err);
+          reload(); // pull fresh state (and a corrected remaining_seconds) rather than getting stuck
+        }
+      }, 1000));
+    }
 
     list.addEventListener("click", async (e) => {
       const btn = e.target.closest("button");
@@ -67,15 +92,13 @@ export default {
           return reload();
         }
 
-        if (btn.dataset.act === "upload") {
-          const file = await pickImage();          // must stay the first await (needs the tap)
-          if (!file) return;
+        if (btn.dataset.act === "start") {
           btn.disabled = true;
-          const image = await fileToCompressedDataURL(file);
-          await api.submitProof(id, image);
-          haptic("success");
-          notify("Screenshot sent! You'll get a message when it's reviewed.");
-          return reload();
+          if (task.url) openAny(task.url);
+          const r = await api.startTask(id);
+          task.status = "pending";
+          task.remaining_seconds = r.remaining_seconds;
+          draw();
         }
       } catch (err) {
         btn.disabled = false;

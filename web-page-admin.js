@@ -4,7 +4,6 @@ import overview  from "./web-page-admin-overview.js";
 import settings  from "./web-page-admin-settings.js";
 import channels  from "./web-page-admin-channels.js";
 import tasks     from "./web-page-admin-tasks.js";
-import proofs    from "./web-page-admin-proofs.js";
 import payouts   from "./web-page-admin-payouts.js";
 import users     from "./web-page-admin-users.js";
 import broadcast from "./web-page-admin-broadcast.js";
@@ -14,7 +13,6 @@ const TABS = [
   { id: "settings",  label: "Settings",    page: settings },
   { id: "channels",  label: "Channels",    page: channels },
   { id: "tasks",     label: "Tasks",       page: tasks },
-  { id: "proofs",    label: "Proofs",      page: proofs },
   { id: "payouts",   label: "Withdrawals", page: payouts },
   { id: "users",     label: "Users",       page: users },
   { id: "broadcast", label: "Broadcast",   page: broadcast }

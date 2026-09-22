@@ -180,35 +180,52 @@ async function completeAutoTask(task, userId) {
   });
 }
 
-async function reviewSubmission(id, approve, adminId) {
-  const s = await tx(async (c) => {
-    const { rows } = await c.query(
-      `SELECT s.id, s.user_id, t.title, t.reward
-         FROM task_submissions s JOIN tasks t ON t.id = s.task_id
-        WHERE s.id = $1 AND s.status = 'pending' FOR UPDATE OF s`,
-      [id]
-    );
-    if (!rows.length) throw new HttpError(404, 'Already reviewed or not found.');
-    const sub = rows[0];
-    await c.query(
-      `UPDATE task_submissions SET status = $2, reviewed_at = now(), reviewed_by = $3 WHERE id = $1`,
-      [id, approve ? 'approved' : 'rejected', adminId]
-    );
-    if (approve) {
-      await c.query('UPDATE users SET balance = balance + $1 WHERE id = $2', [sub.reward, sub.user_id]);
-      await c.query(
-        `INSERT INTO transactions (user_id, amount, type, title) VALUES ($1, $2, 'task', $3)`,
-        [sub.user_id, sub.reward, 'Task: ' + sub.title]
-      );
-    }
-    return sub;
-  });
-  notifyUser(
-    s.user_id,
-    approve
-      ? `✅ Your task "${s.title}" was approved. You earned ${money(s.reward)}.`
-      : `❌ Your screenshot for "${s.title}" was rejected. Open the app to submit a new one.`
+// Timer tasks: starting records when the countdown began; completing pays out once
+// enough real time has passed on the server (never trusting the client's own clock alone).
+async function startTimerTask(task, userId) {
+  const existing = await pool.query(
+    `SELECT created_at FROM task_submissions WHERE task_id = $1 AND user_id = $2 AND status IN ('pending','approved')`,
+    [task.id, userId]
   );
+  if (existing.rowCount) return existing.rows[0].created_at; // already started (or done) — resume, don't restart the clock
+  try {
+    const r = await pool.query(
+      `INSERT INTO task_submissions (task_id, user_id, status) VALUES ($1, $2, 'pending') RETURNING created_at`,
+      [task.id, userId]
+    );
+    return r.rows[0].created_at;
+  } catch (e) {
+    if (e.code === '23505') {
+      const again = await pool.query(
+        `SELECT created_at FROM task_submissions WHERE task_id = $1 AND user_id = $2 AND status IN ('pending','approved')`,
+        [task.id, userId]
+      );
+      if (again.rowCount) return again.rows[0].created_at;
+    }
+    throw e;
+  }
+}
+
+async function completeTimerTask(task, userId) {
+  return tx(async (c) => {
+    const { rows } = await c.query(
+      `SELECT id, created_at FROM task_submissions
+        WHERE task_id = $1 AND user_id = $2 AND status = 'pending' FOR UPDATE`,
+      [task.id, userId]
+    );
+    if (!rows.length) throw new HttpError(400, 'Open the task first, then wait for the countdown.');
+    const waitedSec = (Date.now() - new Date(rows[0].created_at).getTime()) / 1000;
+    if (waitedSec + 1 < task.timer_seconds) { // 1s grace for clock/network drift
+      throw new HttpError(400, `Please wait ${Math.ceil(task.timer_seconds - waitedSec)} more second(s).`);
+    }
+    await c.query(`UPDATE task_submissions SET status = 'approved', reviewed_at = now() WHERE id = $1`, [rows[0].id]);
+    const r = await c.query('UPDATE users SET balance = balance + $1 WHERE id = $2 RETURNING balance', [task.reward, userId]);
+    await c.query(
+      `INSERT INTO transactions (user_id, amount, type, title) VALUES ($1, $2, 'task', $3)`,
+      [userId, task.reward, 'Task: ' + task.title]
+    );
+    return r.rows[0].balance;
+  });
 }
 
 // ---------- Withdrawals and automatic payout ----------
@@ -489,7 +506,7 @@ async function runBroadcast(id, text) {
 
 module.exports = {
   money, displayName, notifyUser, notifyAdmins,
-  registerUser, completeReferral, checkGate, clearGateCache, completeAutoTask, reviewSubmission,
+  registerUser, completeReferral, checkGate, clearGateCache, completeAutoTask, startTimerTask, completeTimerTask,
   createWithdrawal, processWithdrawal, sendPayoutNow, recoverPayouts, classifyPayout, shortAddr,
   adjustBalance, runBroadcast
 };

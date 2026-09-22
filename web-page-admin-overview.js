@@ -13,7 +13,6 @@ export default {
       ["Referrals pending", s.pending_referrals],
       ["Required channels", s.channels],
       ["Active tasks", s.active_tasks],
-      ["Proofs to review", s.pending_proofs],
       ["Pending withdrawals", s.pending_withdrawals],
       ["Payouts to check", s.review_withdrawals],
       ["Pending amount", money(s.pending_amount)],

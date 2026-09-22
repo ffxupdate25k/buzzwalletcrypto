@@ -26,8 +26,7 @@ router.get('/overview', wrap(async (req, res) => {
       (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending') AS pending_withdrawals,
       (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending' AND payout_state = 'review') AS review_withdrawals,
       (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE status = 'pending') AS pending_amount,
-      (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE status = 'paid') AS paid_out,
-      (SELECT COUNT(*) FROM task_submissions WHERE status = 'pending' AND image IS NOT NULL) AS pending_proofs
+      (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE status = 'paid') AS paid_out
   `);
   res.json(rows[0]);
 }));
@@ -72,16 +71,12 @@ router.put('/settings', wrap(async (req, res) => {
   if (newKey && (newKey.length < 8 || newKey.length > 300 || /\s/.test(newKey))) {
     throw new HttpError(400, 'That API key does not look right.');
   }
-  const wc_project_id = String(b.wc_project_id || '').trim();
-  if (wc_project_id && !/^[A-Za-z0-9]{16,64}$/.test(wc_project_id)) {
-    throw new HttpError(400, 'The WalletConnect project ID does not look right.');
-  }
   if (auto_payout && !(newKey || cur.payout_api_key)) throw new HttpError(400, 'Add the payout API key before turning on auto payout.');
   if (auto_payout && !payout_token_address) throw new HttpError(400, 'Add the token address before turning on auto payout.');
 
   const toSave = {
     referral_reward, min_withdraw, max_withdraw, welcome_text,
-    auto_payout: String(auto_payout), payout_api_url, payout_token_address, wc_project_id
+    auto_payout: String(auto_payout), payout_api_url, payout_token_address
   };
   if (newKey) toSave.payout_api_key = newKey; // leaving it empty keeps the saved key
   await saveSettings(toSave);
@@ -94,7 +89,7 @@ async function validateTask(b) {
   const description = String(b.description || '').trim().slice(0, 500);
   const reward = round4(Number(b.reward));
   const url = String(b.url || '').trim().slice(0, 500);
-  const verify_type = b.verify_type === 'auto' ? 'auto' : 'screenshot';
+  const verify_type = b.verify_type === 'auto' ? 'auto' : 'timer';
   const active = b.active !== false;
 
   if (!title) throw new HttpError(400, 'Enter a task title.');
@@ -102,6 +97,7 @@ async function validateTask(b) {
   if (url && !/^https?:\/\//i.test(url)) throw new HttpError(400, 'The link must start with https://');
 
   let chat_id = '';
+  let timer_seconds = 10;
   if (verify_type === 'auto') {
     const chat = tgApi.normalizeChat(b.chat_id);
     if (chat === null) {
@@ -117,8 +113,14 @@ async function validateTask(b) {
       throw new HttpError(400, "The bot can't access that channel or group. Add it as an admin, then try again.");
     }
     chat_id = String(chat);
+  } else {
+    if (!url) throw new HttpError(400, 'Add the link users should open for this task.');
+    timer_seconds = Math.round(Number(b.timer_seconds));
+    if (!Number.isFinite(timer_seconds) || timer_seconds < 3 || timer_seconds > 86400) {
+      throw new HttpError(400, 'Countdown must be between 3 and 86400 seconds.');
+    }
   }
-  return { title, description, reward, url, verify_type, chat_id, active };
+  return { title, description, reward, url, verify_type, chat_id, timer_seconds, active };
 }
 
 router.get('/tasks', wrap(async (req, res) => {
@@ -132,9 +134,9 @@ router.get('/tasks', wrap(async (req, res) => {
 router.post('/tasks', wrap(async (req, res) => {
   const t = await validateTask(req.body || {});
   const { rows } = await pool.query(
-    `INSERT INTO tasks (title, description, reward, url, verify_type, chat_id, active)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [t.title, t.description, t.reward, t.url, t.verify_type, t.chat_id, t.active]
+    `INSERT INTO tasks (title, description, reward, url, verify_type, chat_id, timer_seconds, active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [t.title, t.description, t.reward, t.url, t.verify_type, t.chat_id, t.timer_seconds, t.active]
   );
   res.json({ id: rows[0].id });
 }));
@@ -142,8 +144,8 @@ router.post('/tasks', wrap(async (req, res) => {
 router.put('/tasks/:id', wrap(async (req, res) => {
   const t = await validateTask(req.body || {});
   const r = await pool.query(
-    `UPDATE tasks SET title=$1, description=$2, reward=$3, url=$4, verify_type=$5, chat_id=$6, active=$7 WHERE id=$8`,
-    [t.title, t.description, t.reward, t.url, t.verify_type, t.chat_id, t.active, parseInt(req.params.id, 10)]
+    `UPDATE tasks SET title=$1, description=$2, reward=$3, url=$4, verify_type=$5, chat_id=$6, timer_seconds=$7, active=$8 WHERE id=$9`,
+    [t.title, t.description, t.reward, t.url, t.verify_type, t.chat_id, t.timer_seconds, t.active, parseInt(req.params.id, 10)]
   );
   if (!r.rowCount) throw new HttpError(404, 'Task not found.');
   res.json({ ok: true });
@@ -151,38 +153,6 @@ router.put('/tasks/:id', wrap(async (req, res) => {
 
 router.delete('/tasks/:id', wrap(async (req, res) => {
   await pool.query('DELETE FROM tasks WHERE id = $1', [parseInt(req.params.id, 10)]);
-  res.json({ ok: true });
-}));
-
-// ---------- Screenshot proofs ----------
-router.get('/submissions', wrap(async (req, res) => {
-  const { rows } = await pool.query(`
-    SELECT s.id, s.created_at AS date, t.title AS task_title, t.reward,
-           u.id AS user_id, u.first_name, u.last_name, u.username
-      FROM task_submissions s
-      JOIN tasks t ON t.id = s.task_id
-      JOIN users u ON u.id = s.user_id
-     WHERE s.status = 'pending' AND s.image IS NOT NULL
-     ORDER BY s.id ASC LIMIT 50
-  `);
-  res.json(rows.map((r) => ({ ...r, name: svc.displayName({ ...r, id: r.user_id }) })));
-}));
-
-router.get('/submissions/:id/image', wrap(async (req, res) => {
-  const { rows } = await pool.query('SELECT image, mime FROM task_submissions WHERE id = $1', [parseInt(req.params.id, 10)]);
-  if (!rows.length || !rows[0].image) throw new HttpError(404, 'Image not found.');
-  res.set('Content-Type', rows[0].mime);
-  res.set('Cache-Control', 'private, max-age=300');
-  res.send(rows[0].image);
-}));
-
-router.post('/submissions/:id/approve', wrap(async (req, res) => {
-  await svc.reviewSubmission(parseInt(req.params.id, 10), true, req.user.id);
-  res.json({ ok: true });
-}));
-
-router.post('/submissions/:id/reject', wrap(async (req, res) => {
-  await svc.reviewSubmission(parseInt(req.params.id, 10), false, req.user.id);
   res.json({ ok: true });
 }));
 
@@ -310,9 +280,12 @@ router.delete('/channels/:id', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Lets a user connect a different wallet (support case).
+// Lets a user save a different wallet (support case).
 router.post('/users/:id/wallet/reset', wrap(async (req, res) => {
-  const r = await pool.query('UPDATE users SET wallet_address = NULL, wallet_connected_at = NULL WHERE id = $1', [req.params.id]);
+  const r = await pool.query(
+    `UPDATE users SET wallet_address = NULL, wallet_connected_at = NULL WHERE id = $1`,
+    [req.params.id]
+  );
   if (!r.rowCount) throw new HttpError(404, 'User not found.');
   res.json({ ok: true });
 }));

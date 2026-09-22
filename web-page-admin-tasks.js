@@ -1,4 +1,5 @@
-// Create tasks. Each task is either auto-verified (bot checks channel/group membership) or needs a screenshot.
+// Create tasks. Each task is either auto-verified (bot checks channel/group membership) or
+// timer-verified (a countdown runs after the user opens the link, then the reward is paid).
 import { api } from "./web-api.js";
 import { confirmBox, haptic } from "./web-telegram.js";
 import { esc, money, fail } from "./web-utils.js";
@@ -17,7 +18,7 @@ export default {
               <b>${esc(t.title)}</b>
               <span class="reward" style="color:var(--ok);font-weight:800">+${money(t.reward)}</span>
             </div>
-            <div class="hint">${t.verify_type === "auto" ? "🤖 Auto-verify · " + esc(t.chat_id) : "📸 Screenshot review"} · ${t.completed} completed</div>
+            <div class="hint">${t.verify_type === "auto" ? "🤖 Auto-verify · " + esc(t.chat_id) : "⏱ " + t.timer_seconds + "s countdown"} · ${t.completed} completed</div>
             <div class="acts">
               <span class="badge ${t.active ? "b-ok" : "b-pend"}">${t.active ? "Active" : "Paused"}</span>
               <button class="btn sm ghost" data-act="edit" data-id="${t.id}">Edit</button>
@@ -37,7 +38,7 @@ export default {
               return showList();
             }
             if (b.dataset.act === "delete") {
-              if (!(await confirmBox(`Delete "${t.title}"? This also removes its submissions.`))) return;
+              if (!(await confirmBox(`Delete "${t.title}"? This also removes its progress records.`))) return;
               await api.admin.deleteTask(t.id);
               return showList();
             }
@@ -47,7 +48,7 @@ export default {
     }
 
     function showForm(t) {
-      const v = t || { title: "", description: "", reward: "", url: "", verify_type: "screenshot", chat_id: "", active: true };
+      const v = t || { title: "", description: "", reward: "", url: "", verify_type: "timer", chat_id: "", timer_seconds: 10, active: true };
       el.innerHTML = `
         <div class="card">
           <b>${t ? "Edit task" : "New task"}</b>
@@ -57,17 +58,22 @@ export default {
           <textarea id="f-desc" maxlength="500" style="min-height:70px">${esc(v.description)}</textarea>
           <label for="f-reward">Reward (USD)</label>
           <input id="f-reward" type="number" inputmode="decimal" step="any" value="${esc(v.reward)}">
-          <label for="f-url">Link users open (optional)</label>
-          <input id="f-url" type="url" placeholder="https://t.me/yourchannel" value="${esc(v.url)}">
           <label for="f-type">How is it verified?</label>
           <select id="f-type">
-            <option value="screenshot">Screenshot: I review each upload</option>
+            <option value="timer">Timer: user opens a link, then waits out a countdown</option>
             <option value="auto">Auto: bot checks channel/group membership</option>
           </select>
           <div id="auto-box">
             <label for="f-chat">Channel or group to check</label>
             <input id="f-chat" placeholder="@yourchannel" value="${esc(v.chat_id)}">
             <p class="hint">The bot must be an admin there, otherwise it can't check membership.</p>
+          </div>
+          <div id="timer-box">
+            <label for="f-url">Link users open</label>
+            <input id="f-url" type="url" placeholder="https://t.me/yourchannel" value="${esc(v.url)}">
+            <label for="f-secs">Countdown (seconds)</label>
+            <input id="f-secs" type="number" inputmode="numeric" min="3" max="86400" value="${esc(v.timer_seconds || 10)}">
+            <p class="hint">The reward is credited automatically once this many seconds pass after the user taps Start.</p>
           </div>
           <label class="check"><input type="checkbox" id="f-active" ${v.active ? "checked" : ""}> Task is active</label>
           <div class="gap" style="height:16px"></div>
@@ -78,8 +84,12 @@ export default {
 
       const type = el.querySelector("#f-type");
       const autoBox = el.querySelector("#auto-box");
+      const timerBox = el.querySelector("#timer-box");
       type.value = v.verify_type;
-      const sync = () => { autoBox.hidden = type.value !== "auto"; };
+      const sync = () => {
+        autoBox.hidden = type.value !== "auto";
+        timerBox.hidden = type.value !== "timer";
+      };
       type.onchange = sync;
       sync();
 
@@ -93,6 +103,7 @@ export default {
           url: el.querySelector("#f-url").value,
           verify_type: type.value,
           chat_id: el.querySelector("#f-chat").value,
+          timer_seconds: el.querySelector("#f-secs").value,
           active: el.querySelector("#f-active").checked
         };
         save.disabled = true;
