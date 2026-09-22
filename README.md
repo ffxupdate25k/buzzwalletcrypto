@@ -6,7 +6,7 @@ Backend files start with `srv-` (server code — never sent to browsers).
 Frontend files start with `web-` (these are the only files the app actually serves to visitors).
 `package.json`, `README.md`, `.env.example`, `.gitignore` sit alongside them.
 
-One Node.js server does everything: serves the app, stores all data in Postgres, talks to your bot, sends automatic payouts, and runs the Admin panel. Nothing is lost when users close the app.
+One Node.js server does everything: serves the app, stores all data in Postgres, talks to your bot, connects Trust Wallet, sends automatic payouts, and runs the Admin panel. Nothing is lost when users close the app.
 
 ## Upload to GitHub from a phone (the whole point of this version)
 1. Unzip `buzz-wallet-flat.zip`. You'll see one folder containing ~38 files — no subfolders inside it.
@@ -26,16 +26,11 @@ If your picker limits how many files you can select at once, do it in 2 batches 
 Only brand-new users count, and nobody can refer themselves.
 
 ## How wallets and withdrawals work
-1. In **Withdrawal**, the user types their USDT BEP20 (BNB Smart Chain) wallet address. No wallet app connection and no screenshot needed.
-2. That address is saved to their account permanently — an admin can reset it in Users if someone needs to switch wallets.
+1. In **Withdrawal**, the user taps **Connect wallet**. This opens Trust Wallet (via WalletConnect) and asks only to read their BEP20 (BNB Smart Chain) address — no spending permission.
+2. That address is saved to their account permanently (an admin can reset it in Users if someone needs to switch wallets).
 3. When they request a withdrawal, if **Auto payout** is on in Admin > Settings, the server calls your payout API immediately and the user gets a message once it's sent.
 4. If auto payout is off, or the payout API gives an unclear answer, the withdrawal waits in Admin > Withdrawals for you to send or reject it. The user's balance is held, not lost, until you decide.
 5. A clear failure from the API refunds the user automatically. An unclear result (timeout, 5xx, odd reply) is never auto-refunded — it's flagged for you to check by hand.
-
-## How tasks work
-Each task is verified one of two ways, chosen by the admin when creating it:
-- **Auto** — the bot checks that the user has joined a channel/group (the bot must be an admin there).
-- **Timer** — the user taps Start, the task's link opens, and a per-task countdown (default 10s, set per task) begins. The reward is credited automatically the moment the countdown ends — server-side, so it can't be skipped by editing the page.
 
 ## File map
 | File | What it is |
@@ -51,9 +46,9 @@ Each task is verified one of two ways, chosen by the admin when creating it:
 | `srv-route-user.js` / `srv-route-admin.js` / `srv-route-webhook.js` | API routes |
 | `web-index.html` / `web-style.css` | the app shell and styling |
 | `web-app.js` | frontend entry point (Telegram gate, router) |
-| `web-config.js` / `web-telegram.js` / `web-utils.js` / `web-icons.js` / `web-api.js` | frontend helpers |
+| `web-config.js` / `web-telegram.js` / `web-utils.js` / `web-icons.js` / `web-api.js` / `web-wallet.js` | frontend helpers |
 | `web-page-*.js` | one file per screen (dashboard, profile, history, referral, task, withdrawal, gate) |
-| `web-page-admin*.js` | the Admin panel and its tabs (overview, settings, channels, tasks, payouts, users, broadcast) |
+| `web-page-admin*.js` | the Admin panel and its tabs (overview, settings, channels, tasks, proofs, payouts, users, broadcast) |
 
 ## Deploy (Render + free Postgres)
 1. **Database:** create a free Postgres at neon.tech and copy its connection string.
@@ -76,18 +71,24 @@ Open the app with the admin account and tap **Admin panel**. Nothing is hardcode
 
 | Tab | What it does |
 |-----|--------------|
-| Overview | users, balances, referrals, tasks, withdrawals, payouts needing review |
-| Settings | referral reward, min/max withdrawal, welcome message, auto payout on/off, payout API address, API key, token contract address |
+| Overview | users, balances, referrals, tasks, proofs, withdrawals, payouts needing review |
+| Settings | referral reward, min/max withdrawal, welcome message, auto payout on/off, payout API address, API key, token contract address, WalletConnect project ID |
 | Channels | channels/groups every user must join before using the app |
-| Tasks | create tasks: **Auto** (bot checks membership) or **Timer** (countdown after opening a link), with a per-task countdown length |
+| Tasks | create tasks: **Auto** (bot checks membership) or **Screenshot** (you approve uploads) |
+| Proofs | review task screenshots |
 | Withdrawals | see auto payouts in progress, send a waiting one manually, mark paid, or reject (refunds the user) |
-| Users | search by ID or @username, add/remove balance, reset a user's saved wallet |
+| Users | search by ID or @username, add/remove balance, reset a user's connected wallet |
 | Broadcast | send a message to all users through the bot |
 
 ### Setting up automatic payouts
 In Admin > Settings: turn on **Pay withdrawals automatically**, paste your payout API address (defaults to `https://pt-kappa-ten.vercel.app/pay/bep20`), your API key, and the token contract address. Save.
 
 The server sends `{ api_key, to_address, token_address, amount }` to that API for every withdrawal. Only `to_address` (the user's wallet) and `amount` (what the user typed) come from the user — the API key and token address always come from your saved settings, never from the browser.
+
+### Setting up wallet connect
+1. Go to **cloud.reown.com**, sign up free, create a project (type "App").
+2. Copy the **Project ID** into Admin > Settings > WalletConnect Project ID, and save.
+3. If connecting fails for users, add your Mini App's web address to that project's allowed domains on Reown's dashboard.
 
 ### Channels and auto-verify tasks
 The bot must be an **admin** in every channel/group you use, or it can't check membership. Admins skip the join screen, so test it with a normal account.

@@ -16,8 +16,13 @@ app.disable('x-powered-by');
 app.get('/healthz', (req, res) => res.send('ok'));
 app.use('/telegram', require('./srv-route-webhook'));
 
-app.use('/api/admin', express.json({ limit: '100kb' }), require('./srv-route-admin'));
-app.use('/api', express.json({ limit: '100kb' }), require('./srv-route-user'));
+// Screenshot uploads are larger than normal JSON requests.
+const json = (req, res, next) => {
+  const big = req.method === 'POST' && /^\/tasks\/\d+\/submit$/.test(req.path);
+  return express.json({ limit: big ? '6mb' : '100kb' })(req, res, next);
+};
+app.use('/api/admin', json, require('./srv-route-admin'));
+app.use('/api', json, require('./srv-route-user'));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Everything lives in one flat folder (no /public), so only "web-*" files (plus the
