@@ -7,7 +7,7 @@ function walletForm(el, onSaved) {
   el.innerHTML = `
     <div class="card">
       <b>Add your payout wallet</b>
-      <p class="hint" style="font-size:13px">Enter your USDT BEP20 (BNB Smart Chain) wallet address. This is used for all your payouts and can't be changed later — contact the admin if you make a mistake.</p>
+      <p class="hint" style="font-size:13px">Enter your USDT BEP20 (BNB Smart Chain) wallet address(Trust Wallet Highly Recommended).This is used for all your payouts and can't be changed later — contact the admin if you make a mistake.</p>
       <label for="w-addr">Wallet address</label>
       <input id="w-addr" type="text" placeholder="0x...">
       <div class="gap" style="height:14px"></div>
