@@ -38,6 +38,8 @@ module.exports = {
   getChat: (chat) => call('getChat', { chat_id: chatArg(chat) }),
   sendMessage: (chat_id, text, extra = {}) =>
     call('sendMessage', { chat_id, text, disable_web_page_preview: true, ...extra }),
+  sendPhoto: (chat_id, photo, caption = '', extra = {}) =>
+    call('sendPhoto', { chat_id, photo, caption, ...extra }),
   getChatMember: (chat, user_id) => call('getChatMember', { chat_id: chatArg(chat), user_id }),
   setWebhook: (url, secret) =>
     call('setWebhook', {

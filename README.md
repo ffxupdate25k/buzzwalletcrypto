@@ -94,3 +94,11 @@ The bot must be an **admin** in every channel/group you use, or it can't check m
 
 ## Run on your computer (optional)
 Copy `.env.example` to `.env`, fill it in, then `npm install` and `npm start`. Telegram needs an https address, so use a tunnel such as ngrok and set `PUBLIC_URL` to it.
+
+
+## UI & Broadcast updates
+- Refreshed the entire Mini App visual system with a premium dark/glass UI, modern cards, buttons, tabs and dashboard styling.
+- Automatic referral, payout, withdrawal and other operational bot notifications are disabled. Statuses remain visible in the Mini App and refresh automatically while the user is viewing normal user pages.
+- Admin Broadcast now supports an optional HTTPS/HTTP photo URL and up to 5 inline URL buttons.
+- Photo broadcasts use Telegram's photo message so users can tap the image to open it.
+- Broadcast delivery progress is still tracked in the Admin panel.

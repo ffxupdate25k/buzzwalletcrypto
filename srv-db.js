@@ -108,6 +108,8 @@ CREATE TABLE IF NOT EXISTS withdrawals (
 CREATE TABLE IF NOT EXISTS broadcasts (
   id         SERIAL PRIMARY KEY,
   text       TEXT NOT NULL,
+  photo_url  TEXT NOT NULL DEFAULT '',
+  buttons    JSONB NOT NULL DEFAULT '[]'::jsonb,
   total      INT NOT NULL DEFAULT 0,
   sent       INT NOT NULL DEFAULT 0,
   failed     INT NOT NULL DEFAULT 0,
@@ -138,6 +140,10 @@ ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_state TEXT NOT NULL DEFA
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS tx_hash TEXT;
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS note TEXT;
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_response TEXT;
+
+-- Rich broadcasts: optional photo and inline buttons.
+ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_url TEXT NOT NULL DEFAULT '';
+ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS buttons JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 -- Timer-based tasks: instead of a screenshot, a per-task countdown (seconds) runs after the
 -- user opens the task link, and the reward is credited once enough time has genuinely passed.

@@ -63,7 +63,7 @@ export const api = {
     adjustBalance:     (id, amount, note) => post(`/api/admin/users/${id}/balance`, { amount, note }),
     resetWallet:       (id)        => post(`/api/admin/users/${id}/wallet/reset`),
 
-    broadcast:         (text)      => post("/api/admin/broadcast", { text }),
+    broadcast:         (payload)  => post("/api/admin/broadcast", payload),
     broadcasts:        ()          => http("/api/admin/broadcasts")
   }
 };

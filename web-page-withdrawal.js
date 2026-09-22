@@ -79,7 +79,7 @@ export default {
       try {
         const r = await api.requestWithdrawal({ amount });
         haptic("success");
-        notify(r.auto ? "Withdrawal submitted. Your payout is being sent. You'll get a message when it arrives." : "Withdrawal requested. An admin will review it soon.");
+        notify(r.auto ? "Withdrawal submitted. Track the payout status in History." : "Withdrawal requested. Track the request status in History.");
         go("history");
       } catch (err) {
         btn.disabled = false;

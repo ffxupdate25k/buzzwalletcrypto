@@ -292,17 +292,38 @@ router.post('/users/:id/wallet/reset', wrap(async (req, res) => {
 
 // ---------- Broadcast ----------
 router.post('/broadcast', wrap(async (req, res) => {
-  const text = String((req.body || {}).text || '').trim();
+  const body = req.body || {};
+  const text = String(body.text || '').trim();
+  const photo_url = String(body.photo_url || '').trim().slice(0, 1000);
+
   if (!text) throw new HttpError(400, 'Write a message first.');
   if (text.length > 3500) throw new HttpError(400, 'Message is too long (max 3500 characters).');
-  const { rows } = await pool.query('INSERT INTO broadcasts (text, created_by) VALUES ($1, $2) RETURNING id', [text, req.user.id]);
-  svc.runBroadcast(rows[0].id, text); // runs in the background
+  if (photo_url && !/^https?:\/\//i.test(photo_url)) {
+    throw new HttpError(400, 'Photo URL must start with http:// or https://');
+  }
+
+  let buttons = [];
+  try {
+    buttons = Array.isArray(body.buttons) ? body.buttons : [];
+  } catch (_) { buttons = []; }
+
+  if (buttons.length > 5) throw new HttpError(400, 'Maximum 5 inline buttons.');
+  buttons = buttons.map((b) => ({
+    text: String(b && b.text || '').trim().slice(0, 64),
+    url: String(b && b.url || '').trim().slice(0, 500)
+  })).filter((b) => b.text && /^https?:\/\//i.test(b.url));
+
+  const { rows } = await pool.query(
+    'INSERT INTO broadcasts (text, photo_url, buttons, created_by) VALUES ($1, $2, $3::jsonb, $4) RETURNING id',
+    [text, photo_url, JSON.stringify(buttons), req.user.id]
+  );
+  svc.runBroadcast(rows[0].id, text, photo_url, buttons);
   res.json({ id: rows[0].id });
 }));
 
 router.get('/broadcasts', wrap(async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT id, text, total, sent, failed, status, created_at AS date FROM broadcasts ORDER BY id DESC LIMIT 10'
+    'SELECT id, text, photo_url, buttons, total, sent, failed, status, created_at AS date FROM broadcasts ORDER BY id DESC LIMIT 10'
   );
   res.json(rows);
 }));

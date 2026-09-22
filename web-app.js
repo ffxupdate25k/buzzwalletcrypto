@@ -1,5 +1,5 @@
 // Entry point: Telegram-only gate, required-channel gate, router, back button.
-import { isTelegram, initTelegram, backButton, notify, askWriteAccess } from "./web-telegram.js";
+import { isTelegram, initTelegram, backButton } from "./web-telegram.js";
 import { api } from "./web-api.js";
 import { esc } from "./web-utils.js";
 
@@ -24,7 +24,6 @@ function boot() {
   initTelegram();
   const app = document.getElementById("app");
   app.hidden = false;
-  askWriteAccess();
 
   function showError(err) {
     app.innerHTML = `<div class="empty">${esc(err.message)}<div class="gap"></div><button class="btn sm" id="retry">Try again</button></div>`;
@@ -45,6 +44,7 @@ function boot() {
   }
 
   async function go(name) {
+    currentName = name;
     const page = routes[name] || routes.home;
     app.innerHTML = `<div class="loading">Loading…</div>`;
     window.scrollTo(0, 0);
@@ -57,7 +57,34 @@ function boot() {
     }
   }
 
+  // Keep user-facing balances/history fresh without sending any bot notifications.
+  // Admin pages and task countdowns are left alone while they are being used.
+  let refreshBusy = false;
+  let snapshot = "";
+  async function autoRefresh() {
+    if (refreshBusy || document.hidden || currentName === "admin" || currentName === "task") return;
+    if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    refreshBusy = true;
+    try {
+      const [me, history] = await Promise.all([api.getMe(), api.getHistory()]);
+      const next = JSON.stringify({
+        balance: me.balance,
+        referrals: me.referrals,
+        wallet: me.wallet_address,
+        history: history.slice(0, 10).map(x => [x.date, x.amount, x.status, x.title])
+      });
+      if (snapshot && next !== snapshot) await go(currentName, true);
+      snapshot = next;
+    } catch (_) {
+      // Background refresh is best-effort; the visible page stays usable offline.
+    } finally {
+      refreshBusy = false;
+    }
+  }
+  let currentName = "home";
+
   backButton.onClick(() => go("home"));
   window.addEventListener("bw:gate", enter); // any page can request the gate
   enter();
+  setInterval(autoRefresh, 12000);
 }

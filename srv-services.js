@@ -18,20 +18,11 @@ function displayName(u) {
 }
 
 // ---------- Messaging ----------
-async function notifyUser(id, text, extra) {
-  try {
-    await tgApi.sendMessage(id, text, extra);
-    return true;
-  } catch (e) {
-    if (e.code === 403) pool.query('UPDATE users SET bot_blocked = TRUE WHERE id = $1', [id]).catch(() => {});
-    console.warn('Could not message', id, '-', e.message);
-    return false;
-  }
-}
-
-function notifyAdmins(text) {
-  ADMIN_IDS.forEach((id) => { notifyUser(id, text); });
-}
+// Operational events stay inside the Mini App. The bot does not send automatic
+// referral, task, withdrawal or payout notifications. Admin broadcasts are separate
+// and are sent only when an admin explicitly starts one.
+async function notifyUser() { return false; }
+function notifyAdmins() { return false; }
 
 // ---------- Users and referrals ----------
 async function registerUser(u, refId) {
@@ -468,9 +459,13 @@ async function adjustBalance(userId, delta, note) {
 }
 
 // ---------- Broadcast ----------
-async function runBroadcast(id, text) {
+async function runBroadcast(id, text, photoUrl = '', buttons = []) {
   let sent = 0;
   let failed = 0;
+  const markup = Array.isArray(buttons) && buttons.length
+    ? { reply_markup: { inline_keyboard: buttons.map((b) => [{ text: b.text, url: b.url }]) } }
+    : {};
+
   try {
     const { rows } = await pool.query('SELECT id FROM users WHERE bot_blocked = FALSE');
     await pool.query('UPDATE broadcasts SET total = $1 WHERE id = $2', [rows.length, id]);
@@ -479,13 +474,17 @@ async function runBroadcast(id, text) {
       let done = false;
       for (let attempt = 0; attempt < 2 && !done; attempt++) {
         try {
-          await tgApi.sendMessage(row.id, text);
+          if (photoUrl) {
+            await tgApi.sendPhoto(row.id, photoUrl, text, markup);
+          } else {
+            await tgApi.sendMessage(row.id, text, markup);
+          }
           sent++;
           done = true;
         } catch (e) {
           if (e.code === 429 && e.retryAfter) {
             await sleep((e.retryAfter + 1) * 1000);
-            continue; // retry once
+            continue;
           }
           if (e.code === 403) await pool.query('UPDATE users SET bot_blocked = TRUE WHERE id = $1', [row.id]).catch(() => {});
           failed++;
@@ -495,15 +494,20 @@ async function runBroadcast(id, text) {
       if ((sent + failed) % 20 === 0) {
         await pool.query('UPDATE broadcasts SET sent = $1, failed = $2 WHERE id = $3', [sent, failed, id]);
       }
-      await sleep(50); // stay well under Telegram's ~30 messages/second limit
+      await sleep(50);
     }
-    await pool.query(`UPDATE broadcasts SET sent = $1, failed = $2, status = 'done' WHERE id = $3`, [sent, failed, id]);
+    await pool.query(
+      `UPDATE broadcasts SET sent = $1, failed = $2, status = 'done' WHERE id = $3`,
+      [sent, failed, id]
+    );
   } catch (e) {
     console.error('Broadcast failed:', e.message);
-    await pool.query(`UPDATE broadcasts SET sent = $1, failed = $2, status = 'error' WHERE id = $3`, [sent, failed, id]).catch(() => {});
+    await pool.query(
+      `UPDATE broadcasts SET sent = $1, failed = $2, status = 'error' WHERE id = $3`,
+      [sent, failed, id]
+    ).catch(() => {});
   }
 }
-
 module.exports = {
   money, displayName, notifyUser, notifyAdmins,
   registerUser, completeReferral, checkGate, clearGateCache, completeAutoTask, startTimerTask, completeTimerTask,
