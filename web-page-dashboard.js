@@ -30,11 +30,11 @@ export default {
             <div><small>Welcome back</small><b>${esc(name)}</b><em class="bee-tag">🐝 Honey secured</em></div>
           </div>
         </div>
-        <button class="customer-service card" id="customer-service"><span class="cs-icon">💬</span><span><b>Customer Service</b><small>Chat with our support team</small></span><span class="cs-arrow">›</span></button>
         <div class="balance">
           <div><small>Your balance</small><div class="amt">${money(me.balance)}</div></div>
           <div class="chip">${me.referrals} referrals</div>
         </div>
+        <button class="customer-service card" id="customer-service"><span class="cs-icon">💬</span><span><b>Customer Service</b><small>Chat privately with our support team</small></span><span class="cs-arrow">›</span></button>
         <div class="grid">
           ${buttons.map((b) => `
             <button class="tile${b.wide ? " wide" : ""}${b.admin ? " admin" : ""}" data-go="${b.go}">
@@ -51,10 +51,17 @@ export default {
     // Show paid withdrawals as separate toast-style popups, one after another.
     if (recentPayouts.length) {
       let i = 0;
+      let shownInBatch = 0;
       const pop = document.createElement("div"); pop.className = "payout-pop"; document.body.appendChild(pop);
       const next = () => {
-        if (i >= recentPayouts.length) { pop.remove(); return; }
-        const p = recentPayouts[i++];
+        if (i >= recentPayouts.length) { i = 0; }
+        if (shownInBatch >= 10) {
+          shownInBatch = 0;
+          pop.classList.remove("show");
+          setTimeout(next, 60000);
+          return;
+        }
+        const p = recentPayouts[i++]; shownInBatch++;
         const who = p.username ? "@" + p.username : (p.name || "User");
         pop.innerHTML = `<span class="payout-dot">✓</span><span><b>${esc(who)}</b><small>just withdrew ${money(p.amount)}</small></span>`;
         pop.classList.remove("show"); void pop.offsetWidth; pop.classList.add("show");
