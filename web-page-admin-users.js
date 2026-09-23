@@ -105,11 +105,22 @@ export default {
     function drawSearch() {
       el.innerHTML = `
         <div class="card">
+          <b>Wallet management</b>
+          <p class="hint">Resetting all wallets only clears saved wallet addresses. Balances and withdrawal history are not affected.</p>
+          <button class="btn danger" id="reset-all-wallets">Reset all users' wallets</button>
+        </div>
+        <div class="card">
           <input id="q" type="search" placeholder="Search by Telegram ID or @username" value="${esc(lastQuery)}">
           <div class="gap"></div>
           <button class="btn" id="go">Search</button>
         </div>
         <div id="results"></div>`;
+      el.querySelector("#reset-all-wallets").onclick = async () => {
+        if (!(await confirmBox("Reset all wallets? This will clear every user's saved wallet address. Users can set a new wallet afterward. Balances and history will remain unchanged."))) return;
+        const b = el.querySelector("#reset-all-wallets"); b.disabled = true;
+        try { const r = await api.admin.resetAllWallets(); haptic("success"); notify(`${r.reset || 0} wallet(s) reset.`); await search(lastQuery); }
+        catch (err) { fail(err); } finally { b.disabled = false; }
+      };
       const run = () => search(el.querySelector("#q").value.trim()).catch(fail);
       el.querySelector("#go").onclick = run;
       el.querySelector("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") run(); });

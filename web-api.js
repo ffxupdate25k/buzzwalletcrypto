@@ -37,7 +37,7 @@ export const api = {
   getTasks:          ()        => http("/api/tasks"),
   claimTask:         (id)      => post(`/api/tasks/${id}/claim`),
   startTask:         (id)      => post(`/api/tasks/${id}/start`),
-  saveWallet:        (address) => post("/api/wallet", { address }),
+  saveWallet:        (address, wallet_app = "trust_wallet") => post("/api/wallet", { address, wallet_app }),
   requestWithdrawal: (payload) => post("/api/withdrawals", payload),
   getWithdrawalStatus: (id) => http(`/api/withdrawals/${id}/status`),
 
@@ -64,6 +64,7 @@ export const api = {
     users:             (q)         => http(`/api/admin/users?q=${encodeURIComponent(q || "")}`),
     adjustBalance:     (id, amount, note) => post(`/api/admin/users/${id}/balance`, { amount, note }),
     resetWallet:       (id)        => post(`/api/admin/users/${id}/wallet/reset`),
+    resetAllWallets:   ()          => post("/api/admin/users/wallets/reset-all"),
 
     broadcast:         (payload)  => post("/api/admin/broadcast", payload),
     broadcasts:        ()          => http("/api/admin/broadcasts")

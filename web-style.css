@@ -159,38 +159,5 @@ label{color:#cdb998}.link{background:rgba(255,178,28,.055);border-color:rgba(255
   .boot-brand{font-size:27px}
 }
 
-/* Recent payout popups — one notification at a time, then fade away */
-.recent-payout-popup{
-  position:fixed;
-  left:50%;
-  bottom:calc(88px + env(safe-area-inset-bottom,0px));
-  transform:translate(-50%,14px) scale(.96);
-  z-index:110;
-  display:flex;
-  align-items:center;
-  gap:9px;
-  max-width:calc(100vw - 34px);
-  padding:11px 15px 11px 11px;
-  border:1px solid rgba(255,193,57,.28);
-  border-radius:999px;
-  background:rgba(31,15,5,.96);
-  color:#fff8e8;
-  box-shadow:0 14px 38px rgba(0,0,0,.45),0 0 24px rgba(255,181,27,.10);
-  backdrop-filter:blur(12px);
-  -webkit-backdrop-filter:blur(12px);
-  font-size:12px;
-  font-weight:650;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .42s ease,transform .42s ease;
-  white-space:nowrap;
-}
-.recent-payout-popup.show{opacity:1;transform:translate(-50%,0) scale(1)}
-.recent-payout-popup b{color:#ffc52b;font-weight:900}
-.recent-payout-dot{
-  width:25px;height:25px;border-radius:50%;flex:none;
-  display:flex;align-items:center;justify-content:center;
-  background:rgba(53,210,138,.14);color:#51df9b;
-  border:1px solid rgba(53,210,138,.25);font-size:13px;font-weight:900;
-}
-@media(max-width:360px){.recent-payout-popup{font-size:11px;max-width:calc(100vw - 24px);padding-right:12px}}
+
+.wallet-choice-grid{display:grid;gap:10px;margin-top:14px}.wallet-choice{width:100%;display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--text);text-align:left;cursor:pointer}.wallet-choice b{display:block}.wallet-choice small{display:block;color:var(--muted);margin-top:2px}.wallet-choice i{margin-left:auto;font-size:22px;font-style:normal;color:var(--muted)}.wallet-choice.selected{border-color:var(--blue);box-shadow:0 0 0 2px rgba(51,117,187,.14)}.wallet-choice.disabled{opacity:.62;cursor:not-allowed}.trust-logo{display:grid;place-items:center}.wallet-placeholder{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--bg2,var(--card));font-size:22px;color:var(--muted)}

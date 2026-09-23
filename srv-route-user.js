@@ -30,6 +30,7 @@ router.get('/me', wrap(async (req, res) => {
     is_admin: req.isAdmin,
     referral_link: `https://t.me/${state.bot.username}?start=ref_${req.user.id}`,
     wallet_address: req.user.wallet_address || null,
+    wallet_app: req.user.wallet_app || null,
     auto_payout: !!(s.auto_payout && s.payout_api_key && s.payout_token_address),
     referral_reward: s.referral_reward,
     min_withdraw: s.min_withdraw,
@@ -156,26 +157,28 @@ router.post('/tasks/:id/claim', wrap(async (req, res) => {
   res.json({ reward: task.reward, balance });
 }));
 
-// Saves the USDT BEP20 wallet address the user typed. Can only be set once; an admin can
-// reset it in Users if the user made a mistake.
+// Saves or changes the user's selected wallet. Only Trust Wallet is enabled for now.
 router.post('/wallet', wrap(async (req, res) => {
-  const address = String((req.body || {}).address || '').trim().toLowerCase();
+  const body = req.body || {};
+  const address = String(body.address || '').trim().toLowerCase();
+  const walletApp = String(body.wallet_app || '').trim().toLowerCase();
+  if (walletApp !== 'trust_wallet') throw new HttpError(400, 'Only Trust Wallet is available right now.');
   if (!/^0x[a-fA-F0-9]{40}$/.test(address) || /^0x0{40}$/.test(address)) {
     throw new HttpError(400, 'That is not a valid USDT BEP20 wallet address.');
   }
   let r;
   try {
     r = await pool.query(
-      `UPDATE users SET wallet_address = $1, wallet_connected_at = now()
-        WHERE id = $2 AND wallet_address IS NULL RETURNING wallet_address`,
-      [address, req.user.id]
+      `UPDATE users SET wallet_address = $1, wallet_app = $2, wallet_connected_at = now()
+        WHERE id = $3 RETURNING wallet_address, wallet_app`,
+      [address, walletApp, req.user.id]
     );
   } catch (e) {
     if (e.code === '23505') throw new HttpError(409, 'This wallet address is already linked to another account.');
     throw e;
   }
-  if (!r.rowCount) throw new HttpError(409, 'Your wallet is already saved.');
-  res.json({ wallet_address: r.rows[0].wallet_address });
+  if (!r.rowCount) throw new HttpError(404, 'User not found.');
+  res.json({ wallet_address: r.rows[0].wallet_address, wallet_app: r.rows[0].wallet_app });
 }));
 
 router.get('/withdrawals/:id/status', wrap(async (req, res) => {

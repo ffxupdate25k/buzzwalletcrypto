@@ -1,33 +1,61 @@
 import { api } from "./web-api.js";
-import { notify, haptic } from "./web-telegram.js";
+import { notify, haptic, confirmBox } from "./web-telegram.js";
 import { esc, money, pageTop, fail, shortAddr } from "./web-utils.js";
 import { icons } from "./web-icons.js";
 
-function walletForm(el, onSaved) {
+function trustLogo() {
+  return `<span class="trust-logo" aria-hidden="true"><svg viewBox="0 0 48 48" width="42" height="42"><path d="M24 3 41 12v10c0 11.3-6.9 19.1-17 23C13.9 41.1 7 33.3 7 22V12L24 3Z" fill="#3375BB"/><path d="M24 10 14 15.3v6.2c0 7.4 4 12.9 10 15.8 6-2.9 10-8.4 10-15.8v-6.2L24 10Z" fill="#fff" opacity=".95"/><path d="M24 13.2 17 17v4.5c0 4.7 2.5 8.4 7 10.8 4.5-2.4 7-6.1 7-10.8V17l-7-3.8Z" fill="#3375BB"/></svg></span>`;
+}
+
+function walletForm(el, onSaved, existingAddress = "") {
+  let selected = "";
   el.innerHTML = `
     <div class="card">
-      <b>Add your payout wallet</b>
-      <p class="hint" style="font-size:13px">Enter your USDT BEP20 (BNB Smart Chain) wallet address (Trust Wallet Highly Recommended). This is used for all your payouts and can't be changed later — contact the admin if you make a mistake.</p>
-      <label for="w-addr">Wallet address</label>
-      <input id="w-addr" type="text" placeholder="0x...">
-      <div class="gap" style="height:14px"></div>
-      <button class="btn" id="w-save">Save wallet</button>
+      <b>${existingAddress ? "Change payout wallet" : "Set your payout wallet"}</b>
+      <p class="hint">First choose the wallet app you are using. Your wallet address must be a USDT BEP20 address.</p>
+      <div class="wallet-choice-grid">
+        <button class="wallet-choice" id="trust-choice" type="button">
+          ${trustLogo()}<span><b>Trust Wallet</b><small>Available</small></span><i>›</i>
+        </button>
+        <button class="wallet-choice disabled" id="crypto-choice" type="button" disabled>
+          <span class="wallet-placeholder">◈</span><span><b>Crypto Wallet</b><small>Under Maintenance · Due to network mismatch</small></span><i>🔒</i>
+        </button>
+      </div>
+      <div id="wallet-address-area"></div>
     </div>`;
 
-  const save = el.querySelector("#w-save");
-  save.onclick = async () => {
-    const address = el.querySelector("#w-addr").value.trim();
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) { haptic("error"); return notify("Enter a valid USDT BEP20 wallet address (starts with 0x)."); }
-    save.disabled = true;
-    try {
-      await api.saveWallet(address);
-      haptic("success");
-      notify("Wallet saved.");
-      onSaved();
-    } catch (err) {
-      save.disabled = false;
-      fail(err);
-    }
+  const area = el.querySelector("#wallet-address-area");
+  el.querySelector("#trust-choice").onclick = () => {
+    selected = "trust_wallet";
+    el.querySelectorAll(".wallet-choice").forEach(x => x.classList.remove("selected"));
+    el.querySelector("#trust-choice").classList.add("selected");
+    area.innerHTML = `
+      <div class="gap" style="height:12px"></div>
+      <label for="w-addr">Trust Wallet BEP20 address</label>
+      <input id="w-addr" type="text" inputmode="text" autocomplete="off" placeholder="0x..." value="${esc(existingAddress)}">
+      <p class="hint">Open Trust Wallet → USDT → Receive → copy your BNB Smart Chain (BEP20) address.</p>
+      <button class="btn" id="w-save">${existingAddress ? "Save new wallet" : "Continue"}</button>`;
+
+    area.querySelector("#w-save").onclick = async () => {
+      const address = area.querySelector("#w-addr").value.trim();
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address) || /^0x0{40}$/i.test(address)) {
+        haptic("error"); return notify("Enter a valid Trust Wallet USDT BEP20 address.");
+      }
+      if (selected !== "trust_wallet") return notify("Choose Trust Wallet first.");
+      const ok = await confirmBox("Confirm this is your Trust Wallet USDT BEP20 address. Only confirm if you copied the address from Trust Wallet.");
+      if (!ok) return;
+      const save = area.querySelector("#w-save");
+      save.disabled = true;
+      try {
+        await api.saveWallet(address, selected);
+        haptic("success");
+        notify("Trust Wallet saved.");
+        onSaved();
+      } catch (err) {
+        save.disabled = false;
+        fail(err);
+      }
+    };
   };
 }
 
@@ -206,7 +234,8 @@ export default {
           <div class="dot">${icons.withdrawal}</div>
           <div><b class="mono" style="font-family:inherit">${esc(shortAddr(me.wallet_address))}</b><small>Saved · USDT BEP20 wallet</small></div>
         </div>
-        <p class="hint">This is your payout wallet. To use a different one, contact the admin.</p>
+        <p class="hint">${me.wallet_app === "trust_wallet" ? "Trust Wallet · USDT BEP20" : "USDT BEP20 wallet"}</p>
+        <button class="btn ghost" id="change-wallet">Change wallet</button>
       </div>
       <div class="card">
         <div class="row"><span class="l">Available</span><span class="r">${money(me.balance)}</span></div>
@@ -218,6 +247,8 @@ export default {
         <div style="height:12px"></div>
         <button class="btn" id="submit">Withdraw</button>
       </div>`;
+
+    body.querySelector("#change-wallet").onclick = () => walletForm(body, () => go("withdrawal"), me.wallet_address);
 
     const btn = body.querySelector("#submit");
     btn.onclick = async () => {

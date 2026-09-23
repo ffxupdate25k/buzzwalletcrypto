@@ -131,6 +131,7 @@ ALTER TABLE referrals ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
 -- Manually entered USDT BEP20 wallet (one wallet can belong to only one account).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_address TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_app TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_connected_at TIMESTAMPTZ;
 -- wallet_qr_image / wallet_qr_mime: from an earlier version that asked for a QR screenshot.
 -- No longer written to; left in place only so nothing breaks for anyone who already has them.

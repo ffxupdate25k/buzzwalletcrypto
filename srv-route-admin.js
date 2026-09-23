@@ -343,6 +343,12 @@ router.post('/users/:id/wallet/reset', wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Reset every user's saved wallet. This only clears wallet details; balances and withdrawal history remain untouched.
+router.post('/users/wallets/reset-all', wrap(async (req, res) => {
+  const r = await pool.query(`UPDATE users SET wallet_address = NULL, wallet_app = NULL, wallet_connected_at = NULL WHERE wallet_address IS NOT NULL OR wallet_app IS NOT NULL`);
+  res.json({ ok: true, reset: r.rowCount });
+}));
+
 // ---------- Broadcast ----------
 router.post('/broadcast', wrap(async (req, res) => {
   const body = req.body || {};
