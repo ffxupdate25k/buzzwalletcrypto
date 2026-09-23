@@ -11,8 +11,9 @@ import referral   from "./web-page-referral.js";
 import task       from "./web-page-task.js";
 import withdrawal from "./web-page-withdrawal.js";
 import admin      from "./web-page-admin.js";
+import support    from "./web-page-support.js";
 
-const routes = { home: dashboard, profile, history, referral, task, withdrawal, admin };
+const routes = { home: dashboard, profile, history, referral, task, withdrawal, admin, support };
 
 if (!isTelegram()) {
   const loader = document.getElementById("boot-loader");

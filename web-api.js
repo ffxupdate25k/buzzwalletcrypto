@@ -33,6 +33,8 @@ export const api = {
   getMe:             ()        => http("/api/me"),
   getHistory:        ()        => http("/api/history"),
   getRecentPayouts:  ()        => http("/api/recent-payouts"),
+  supportMessages:   ()        => http("/api/support/messages"),
+  sendSupportMessage:(body)    => post("/api/support/messages", { body }),
   getReferrals:      ()        => http("/api/referrals"),
   getTasks:          ()        => http("/api/tasks"),
   claimTask:         (id)      => post(`/api/tasks/${id}/claim`),
@@ -67,6 +69,9 @@ export const api = {
     resetAllWallets:   ()          => post("/api/admin/users/wallets/reset-all"),
 
     broadcast:         (payload)  => post("/api/admin/broadcast", payload),
-    broadcasts:        ()          => http("/api/admin/broadcasts")
+    broadcasts:        ()          => http("/api/admin/broadcasts"),
+    supportConversations: ()      => http("/api/admin/support/conversations"),
+    supportConversation: (id)    => http(`/api/admin/support/conversations/${encodeURIComponent(id)}`),
+    replySupport:       (id, body) => post(`/api/admin/support/conversations/${encodeURIComponent(id)}`, { body })
   }
 };

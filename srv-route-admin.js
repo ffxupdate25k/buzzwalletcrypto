@@ -349,6 +349,37 @@ router.post('/users/wallets/reset-all', wrap(async (req, res) => {
   res.json({ ok: true, reset: r.rowCount });
 }));
 
+// ---------- Customer service ----------
+router.get('/support/conversations', wrap(async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT u.id, u.first_name, u.last_name, u.username,
+           (SELECT body FROM support_messages m2 WHERE m2.user_id=u.id ORDER BY m2.id DESC LIMIT 1) AS last_message,
+           (SELECT created_at FROM support_messages m2 WHERE m2.user_id=u.id ORDER BY m2.id DESC LIMIT 1) AS last_date,
+           (SELECT COUNT(*) FROM support_messages m3 WHERE m3.user_id=u.id AND m3.sender='user' AND m3.read_at IS NULL) AS unread
+      FROM users u WHERE EXISTS (SELECT 1 FROM support_messages m WHERE m.user_id=u.id)
+      ORDER BY last_date DESC NULLS LAST LIMIT 100`);
+  res.json(rows.map(r => ({...r, id:String(r.id), unread:Number(r.unread||0), name:svc.displayName(r)})));
+}));
+
+router.get('/support/conversations/:id', wrap(async (req, res) => {
+  const id = String(req.params.id);
+  const u = await pool.query('SELECT id, first_name, last_name, username FROM users WHERE id=$1', [id]);
+  if (!u.rows.length) throw new HttpError(404, 'User not found.');
+  const { rows } = await pool.query('SELECT id, sender, body, created_at AS date FROM support_messages WHERE user_id=$1 ORDER BY id ASC LIMIT 300', [id]);
+  await pool.query(`UPDATE support_messages SET read_at=now() WHERE user_id=$1 AND sender='user' AND read_at IS NULL`, [id]);
+  res.json({user:{...u.rows[0], id:String(u.rows[0].id), name:svc.displayName(u.rows[0])}, messages:rows});
+}));
+
+router.post('/support/conversations/:id', wrap(async (req, res) => {
+  const id=String(req.params.id), body=String((req.body||{}).body||'').trim();
+  if (!body) throw new HttpError(400,'Write a reply first.');
+  if (body.length>2000) throw new HttpError(400,'Message is too long.');
+  const u=await pool.query('SELECT id FROM users WHERE id=$1',[id]);
+  if(!u.rows.length) throw new HttpError(404,'User not found.');
+  const {rows}=await pool.query(`INSERT INTO support_messages(user_id,sender,body) VALUES($1,'admin',$2) RETURNING id,sender,body,created_at AS date`,[id,body]);
+  res.json(rows[0]);
+}));
+
 // ---------- Broadcast ----------
 router.post('/broadcast', wrap(async (req, res) => {
   const body = req.body || {};

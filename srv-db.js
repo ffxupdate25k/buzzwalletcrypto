@@ -157,6 +157,13 @@ ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS buttons JSONB NOT NULL DEFAULT '
 
 -- Timer-based tasks: instead of a screenshot, a per-task countdown (seconds) runs after the
 -- user opens the task link, and the reward is credited once enough time has genuinely passed.
+CREATE TABLE IF NOT EXISTS support_messages (
+  id BIGSERIAL PRIMARY KEY, user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sender TEXT NOT NULL CHECK (sender IN ('user','admin')), body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), read_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS support_messages_user_idx ON support_messages(user_id, id);
+
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS timer_seconds INT NOT NULL DEFAULT 10;
 UPDATE tasks SET verify_type = 'timer' WHERE verify_type = 'screenshot';
 ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_verify_type_check;

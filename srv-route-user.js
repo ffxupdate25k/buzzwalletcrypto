@@ -54,13 +54,30 @@ router.get('/history', wrap(async (req, res) => {
 
 router.get('/recent-payouts', wrap(async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT amount, created_at AS date
-      FROM withdrawals
+    SELECT w.amount, w.created_at AS date, u.first_name, u.last_name, u.username, u.id AS user_id
+      FROM withdrawals w JOIN users u ON u.id = w.user_id
      WHERE status = 'paid'
-     ORDER BY processed_at DESC NULLS LAST, id DESC
+     ORDER BY w.processed_at DESC NULLS LAST, w.id DESC
      LIMIT 8
   `);
-  res.json(rows.map((r) => ({ amount: Number(r.amount), date: r.date })));
+  res.json(rows.map((r) => ({ amount: Number(r.amount), date: r.date, user_id: String(r.user_id), username: r.username || '', name: svc.displayName(r) })));
+}));
+
+router.get('/support/messages', wrap(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, sender, body, created_at AS date FROM support_messages WHERE user_id = $1 ORDER BY id ASC LIMIT 200`,
+    [req.user.id]
+  );
+  await pool.query(`UPDATE support_messages SET read_at = now() WHERE user_id = $1 AND sender = 'admin' AND read_at IS NULL`, [req.user.id]);
+  res.json(rows);
+}));
+
+router.post('/support/messages', wrap(async (req, res) => {
+  const body = String((req.body || {}).body || '').trim();
+  if (!body) throw new HttpError(400, 'Write a message first.');
+  if (body.length > 2000) throw new HttpError(400, 'Message is too long.');
+  const { rows } = await pool.query(`INSERT INTO support_messages(user_id, sender, body) VALUES($1,'user',$2) RETURNING id, sender, body, created_at AS date`, [req.user.id, body]);
+  res.json(rows[0]);
 }));
 
 router.get('/referrals', wrap(async (req, res) => {
