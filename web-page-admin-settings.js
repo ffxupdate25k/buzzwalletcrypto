@@ -25,6 +25,10 @@ export default {
         <label for="s-welcome-photo">Welcome photo URL (optional)</label>
         <input id="s-welcome-photo" type="url" placeholder="https://example.com/welcome.jpg" value="${esc(s.welcome_photo_url || '')}">
         <p class="hint">If set, /start sends this photo with the welcome message as its caption. Leave empty to send text only. The image URL must be publicly accessible over HTTPS.</p>
+
+        <label for="s-welcome-emojis">Premium / custom emoji IDs (optional)</label>
+        <input id="s-welcome-emojis" type="text" placeholder="5368324170671202286, 5368324170671202287" value="${esc(s.welcome_emoji_ids || '')}">
+        <p class="hint">Paste Telegram custom emoji IDs separated by commas. In the welcome text, use <b>{1}</b>, <b>{2}</b>, <b>{3}</b>... to place them. Example: <b>{1} Welcome to Buzz Wallet {2}</b>. The IDs must belong to Telegram custom emojis available to the bot.</p>
       </div>
 
       <div class="card">
@@ -57,6 +61,7 @@ export default {
           max_withdraw: el.querySelector("#s-max").value,
           welcome_text: el.querySelector("#s-welcome").value,
           welcome_photo_url: el.querySelector("#s-welcome-photo").value,
+          welcome_emoji_ids: el.querySelector("#s-welcome-emojis").value,
           auto_payout: el.querySelector("#s-auto").checked,
           payout_api_url: el.querySelector("#s-url").value,
           payout_api_key: el.querySelector("#s-key").value,

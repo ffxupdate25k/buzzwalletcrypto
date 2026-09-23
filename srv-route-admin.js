@@ -61,6 +61,13 @@ router.put('/settings', wrap(async (req, res) => {
   if (!welcome_text) throw new HttpError(400, 'The welcome message cannot be empty.');
 
   const welcome_photo_url = String(b.welcome_photo_url || '').trim().slice(0, 1000);
+  const welcome_emoji_ids = String(b.welcome_emoji_ids || '').trim().slice(0, 3000);
+  if (welcome_emoji_ids) {
+    const ids = welcome_emoji_ids.split(/[,\n ]+/).filter(Boolean);
+    if (ids.length > 50 || ids.some((id) => !/^\d{5,30}$/.test(id))) {
+      throw new HttpError(400, 'Premium emoji IDs must be numeric Telegram custom emoji IDs, separated by commas or spaces. Maximum 50.');
+    }
+  }
   if (welcome_photo_url && !/^https:\/\/\S+$/i.test(welcome_photo_url)) {
     throw new HttpError(400, 'The welcome photo URL must start with https://');
   }
@@ -80,7 +87,7 @@ router.put('/settings', wrap(async (req, res) => {
   if (auto_payout && !payout_token_address) throw new HttpError(400, 'Add the token address before turning on auto payout.');
 
   const toSave = {
-    referral_reward, min_withdraw, max_withdraw, welcome_text, welcome_photo_url,
+    referral_reward, min_withdraw, max_withdraw, welcome_text, welcome_photo_url, welcome_emoji_ids,
     auto_payout: String(auto_payout), payout_api_url, payout_token_address
   };
   if (newKey) toSave.payout_api_key = newKey; // leaving it empty keeps the saved key

@@ -5,6 +5,7 @@ const { WEBHOOK_SECRET, PUBLIC_URL } = require('./srv-config');
 const svc = require('./srv-services');
 const tgApi = require('./srv-telegram');
 const { wrap } = require('./srv-errors');
+const { buildWelcomeHtml } = require('./srv-welcome');
 
 const router = express.Router();
 
@@ -33,9 +34,9 @@ async function handleUpdate(u) {
   // If the admin configured a welcome photo, send the /start message as a photo
   // with the welcome text as its caption. Otherwise keep the normal text message.
   if (s.welcome_photo_url) {
-    await tgApi.sendPhoto(m.chat.id, s.welcome_photo_url, s.welcome_text, extra);
+    await tgApi.sendPhoto(m.chat.id, s.welcome_photo_url, buildWelcomeHtml(s.welcome_text, s.welcome_emoji_ids), { ...extra, parse_mode: 'HTML' });
   } else {
-    await tgApi.sendMessage(m.chat.id, s.welcome_text, extra);
+    await tgApi.sendMessage(m.chat.id, buildWelcomeHtml(s.welcome_text, s.welcome_emoji_ids), { ...extra, parse_mode: 'HTML' });
   }
 }
 

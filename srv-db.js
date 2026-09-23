@@ -160,6 +160,7 @@ const DEFAULTS = {
   max_withdraw: '0',
   welcome_text: 'Welcome to Buzz Wallet! Tap the button below to open the app and start earning.',
   welcome_photo_url: '',
+  welcome_emoji_ids: '',
   auto_payout: 'true',
   payout_api_url: 'https://pt-kappa-ten.vercel.app/pay/bep20',
   payout_api_key: '',          // set by the admin in the panel
@@ -184,6 +185,7 @@ async function getSettings(q = pool) {
     max_withdraw: Number(raw.max_withdraw),
     welcome_text: raw.welcome_text,
     welcome_photo_url: raw.welcome_photo_url,
+    welcome_emoji_ids: raw.welcome_emoji_ids || '',
     auto_payout: raw.auto_payout === 'true',
     payout_api_url: raw.payout_api_url,
     payout_api_key: raw.payout_api_key,
