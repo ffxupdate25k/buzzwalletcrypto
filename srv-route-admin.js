@@ -34,11 +34,13 @@ router.get('/overview', wrap(async (req, res) => {
 // ---------- Settings ----------
 // The payout API key is never sent back to the browser, only a short hint of it.
 function publicSettings(s) {
-  const { payout_api_key, ...rest } = s;
+  const { payout_api_key, promoter_payout_api_key, ...rest } = s;
   return {
     ...rest,
     has_api_key: !!payout_api_key,
-    api_key_hint: payout_api_key ? payout_api_key.slice(0, 4) + '…' + payout_api_key.slice(-4) : ''
+    api_key_hint: payout_api_key ? payout_api_key.slice(0, 4) + '…' + payout_api_key.slice(-4) : '',
+    promoter_has_api_key: !!promoter_payout_api_key,
+    promoter_api_key_hint: promoter_payout_api_key ? promoter_payout_api_key.slice(0, 4) + '…' + promoter_payout_api_key.slice(-4) : ''
   };
 }
 
@@ -83,14 +85,38 @@ router.put('/settings', wrap(async (req, res) => {
   if (newKey && (newKey.length < 8 || newKey.length > 300 || /\s/.test(newKey))) {
     throw new HttpError(400, 'That API key does not look right.');
   }
+  const promoter_payout_api_url = String(b.promoter_payout_api_url || '').trim();
+  if (!/^https:\/\/\S+$/i.test(promoter_payout_api_url)) throw new HttpError(400, 'The promoter payout API address must start with https://');
+  const promoter_payout_token_address = String(b.promoter_payout_token_address || '').trim();
+  if (promoter_payout_token_address && !/^0x[a-fA-F0-9]{40}$/.test(promoter_payout_token_address)) {
+    throw new HttpError(400, 'The promoter token address must be 0x followed by 40 letters/numbers.');
+  }
+  const newPromoterKey = String(b.promoter_payout_api_key || '').trim();
+  if (newPromoterKey && (newPromoterKey.length < 8 || newPromoterKey.length > 300 || /\s/.test(newPromoterKey))) {
+    throw new HttpError(400, 'That promoter API key does not look right.');
+  }
+  const promoter_user_ids = String(b.promoter_user_ids || '').trim();
+  if (promoter_user_ids) {
+    const ids = promoter_user_ids.split(/[\s,]+/).filter(Boolean);
+    if (ids.length > 10000 || ids.some((id) => !/^\d{1,20}$/.test(id))) {
+      throw new HttpError(400, 'Promoter user IDs must be numeric Telegram user IDs separated by commas or spaces.');
+    }
+  }
   if (auto_payout && !(newKey || cur.payout_api_key)) throw new HttpError(400, 'Add the payout API key before turning on auto payout.');
   if (auto_payout && !payout_token_address) throw new HttpError(400, 'Add the token address before turning on auto payout.');
+  // Promoter payouts use a completely separate endpoint/key/token. They are only
+  // required when the admin has configured at least one promoter.
+  if (promoter_user_ids && (!promoter_payout_api_url || !(newPromoterKey || cur.promoter_payout_api_key) || !promoter_payout_token_address)) {
+    throw new HttpError(400, 'Configure the promoter payout API URL, API key and token address before adding promoter IDs.');
+  }
 
   const toSave = {
     referral_reward, min_withdraw, max_withdraw, welcome_text, welcome_photo_url, welcome_emoji_ids,
-    auto_payout: String(auto_payout), payout_api_url, payout_token_address
+    auto_payout: String(auto_payout), payout_api_url, payout_token_address,
+    promoter_payout_api_url, promoter_payout_token_address, promoter_user_ids
   };
   if (newKey) toSave.payout_api_key = newKey; // leaving it empty keeps the saved key
+  if (newPromoterKey) toSave.promoter_payout_api_key = newPromoterKey;
   await saveSettings(toSave);
   res.json(publicSettings(await getSettings()));
 }));
@@ -172,7 +198,7 @@ router.delete('/tasks/:id', wrap(async (req, res) => {
 router.get('/withdrawals', wrap(async (req, res) => {
   const status = ['pending', 'paid', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';
   const { rows } = await pool.query(
-    `SELECT w.id, w.amount, w.address, w.status, w.payout_state, w.tx_hash, w.note, w.created_at AS date,
+    `SELECT w.id, w.amount, w.payout_amount, w.withdrawal_type, w.address, w.status, w.payout_state, w.tx_hash, w.note, w.created_at AS date,
             u.id AS user_id, u.first_name, u.last_name, u.username
        FROM withdrawals w JOIN users u ON u.id = w.user_id
       WHERE w.status = $1 ORDER BY w.id ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 50`,

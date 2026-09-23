@@ -15,6 +15,7 @@ export default {
   async render(el, { go }) {
     const me = await api.getMe();
     const name = getDisplayName();
+    const recentPayouts = await api.getRecentPayouts().catch(() => []);
     const buttons = me.is_admin ? [...BUTTONS, { go: "admin", label: "Admin panel", wide: true, admin: true }] : BUTTONS;
 
     el.innerHTML = `
@@ -32,6 +33,17 @@ export default {
           <div><small>Your balance</small><div class="amt">${money(me.balance)}</div></div>
           <div class="chip">${me.referrals} referrals</div>
         </div>
+        ${recentPayouts.length ? `
+        <div class="card recent-payouts">
+          <div class="section-title">Recent payouts</div>
+          <div class="payout-feed">
+            ${recentPayouts.map((p) => `
+              <div class="payout-item">
+                <span class="payout-dot">✓</span>
+                <div><b>User just withdrew ${money(p.amount)}</b><small>${new Date(p.date).toLocaleString()}</small></div>
+              </div>`).join("")}
+          </div>
+        </div>` : ""}
         <div class="grid">
           ${buttons.map((b) => `
             <button class="tile${b.wide ? " wide" : ""}${b.admin ? " admin" : ""}" data-go="${b.go}">

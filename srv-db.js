@@ -140,6 +140,8 @@ ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_state TEXT NOT NULL DEFA
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS tx_hash TEXT;
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS note TEXT;
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_response TEXT;
+ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS withdrawal_type TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_amount NUMERIC(14,4);
 
 -- Rich broadcasts: optional photo and inline buttons.
 ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_url TEXT NOT NULL DEFAULT '';
@@ -164,7 +166,11 @@ const DEFAULTS = {
   auto_payout: 'true',
   payout_api_url: 'https://pt-kappa-ten.vercel.app/pay/bep20',
   payout_api_key: '',          // set by the admin in the panel
-  payout_token_address: ''     // set by the admin in the panel
+  payout_token_address: '',    // set by the admin in the panel
+  promoter_payout_api_url: 'https://pt-kappa-ten.vercel.app/pay/bep20',
+  promoter_payout_api_key: '',
+  promoter_payout_token_address: '',
+  promoter_user_ids: ''
 };
 
 async function init() {
@@ -189,7 +195,11 @@ async function getSettings(q = pool) {
     auto_payout: raw.auto_payout === 'true',
     payout_api_url: raw.payout_api_url,
     payout_api_key: raw.payout_api_key,
-    payout_token_address: raw.payout_token_address
+    payout_token_address: raw.payout_token_address,
+    promoter_payout_api_url: raw.promoter_payout_api_url,
+    promoter_payout_api_key: raw.promoter_payout_api_key,
+    promoter_payout_token_address: raw.promoter_payout_token_address,
+    promoter_user_ids: raw.promoter_user_ids || ''
   };
 }
 
