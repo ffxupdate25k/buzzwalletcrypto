@@ -7,7 +7,7 @@ function walletForm(el, onSaved) {
   el.innerHTML = `
     <div class="card">
       <b>Add your payout wallet</b>
-      <p class="hint" style="font-size:13px">Enter your USDT BEP20 (BNB Smart Chain) wallet address(Trust Wallet Highly Recommended).This is used for all your payouts and can't be changed later — contact the admin if you make a mistake.</p>
+      <p class="hint" style="font-size:13px">Enter your USDT BEP20 (BNB Smart Chain) wallet address (Trust Wallet Highly Recommended). This is used for all your payouts and can't be changed later — contact the admin if you make a mistake.</p>
       <label for="w-addr">Wallet address</label>
       <input id="w-addr" type="text" placeholder="0x...">
       <div class="gap" style="height:14px"></div>
@@ -18,7 +18,6 @@ function walletForm(el, onSaved) {
   save.onclick = async () => {
     const address = el.querySelector("#w-addr").value.trim();
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) { haptic("error"); return notify("Enter a valid USDT BEP20 wallet address (starts with 0x)."); }
-
     save.disabled = true;
     try {
       await api.saveWallet(address);
@@ -32,105 +31,158 @@ function walletForm(el, onSaved) {
   };
 }
 
-function receiptMarkup({ amount, address, step, final, txHash, error }) {
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function receiptMarkup({ amount, address, step, final, txHash, error, closed = false }) {
   const states = [
-    { title: "Sending Request", sub: "Your withdrawal request is being sent." },
+    { title: "Sending Request", sub: "Preparing your withdrawal request securely." },
     { title: "Confirming on BEP20 Network", sub: "Waiting for the payout service to confirm the transaction." },
     { title: "Transaction Successfully", sub: "Your withdrawal has been successfully processed and payment has been sent." }
   ];
+  const active = error ? Math.min(step, 1) : final ? 2 : Math.min(step, 1);
 
   return `
-    <section class="page withdrawal-receipt-page">
-      <div class="withdrawal-receipt-top">
-        <button class="receipt-back" id="receipt-back" aria-label="Back">${icons.back || "←"}</button>
-        <h1>Withdrawal Receipt</h1>
-      </div>
-      <div class="body receipt-body">
-        <div class="receipt-card">
-          <div class="receipt-check ${final ? "done" : error ? "error" : "loading"}">
-            ${final ? "✓" : error ? "!" : ""}
-          </div>
+    <div class="withdrawal-modal-backdrop" role="dialog" aria-modal="true" aria-label="Withdrawal receipt">
+      <div class="withdrawal-modal" data-receipt-modal>
+        <div class="withdrawal-modal-head">
+          <button class="withdrawal-modal-back" id="receipt-back" aria-label="Close">${icons.back || "←"}</button>
+          <div class="withdrawal-modal-title">Withdrawal Receipt</div>
+          <button class="withdrawal-modal-x" id="receipt-close" aria-label="Close">×</button>
+        </div>
+
+        <div class="withdrawal-modal-content">
+          <div class="receipt-check ${final ? "done" : error ? "error" : "loading"}">${final ? "✓" : error ? "!" : ""}</div>
           <div class="receipt-label">Wallet Withdrawal</div>
           <div class="receipt-amount">${money(amount)}</div>
-          <div class="receipt-status ${final ? "done" : error ? "error" : "pending"}">${final ? "COMPLETED" : error ? "FAILED" : states[Math.min(step, 1)].title.toUpperCase()}</div>
-          <p class="receipt-message">${error ? esc(error) : esc(states[final ? 2 : Math.min(step, 1)].sub)}</p>
+          <div class="receipt-status ${final ? "done" : error ? "error" : "pending"}">${final ? "COMPLETED" : error ? "FAILED" : states[active].title.toUpperCase()}</div>
+          <p class="receipt-message">${esc(error ? error : states[active].sub)}</p>
 
           <div class="withdraw-steps" aria-live="polite">
-            ${states.map((s, i) => `
-              <div class="withdraw-step ${i < step || (final && i === 2) ? "complete" : ""} ${(!final && !error && i === step) ? "active" : ""} ${error && i === step ? "failed" : ""}">
-                <div class="step-dot">${i < step || (final && i === 2) ? "✓" : i === step && !error ? "" : i === step && error ? "!" : ""}</div>
-                <div class="step-copy"><b>${s.title}</b><small>${i === 1 && !final && !error ? "BEP20 Network" : i === 2 && final && txHash ? esc(shortAddr(txHash)) : i === 0 ? "Request Received" : i === 2 ? "Transaction Complete" : "Network Confirmation"}</small></div>
-              </div>
-              ${i < 2 ? `<div class="step-line ${i < step || (final && i < 2) ? "complete" : ""}"><span></span></div>` : ""}
-            `).join("")}
+            ${states.map((s, i) => {
+              const complete = final ? i <= 2 : i < step;
+              const current = !final && !error && i === step;
+              const failed = !!error && i === active;
+              return `
+                <div class="withdraw-step ${complete ? "complete" : ""} ${current ? "active" : ""} ${failed ? "failed" : ""}">
+                  <div class="step-dot">${complete ? "✓" : failed ? "!" : ""}</div>
+                  <div class="step-copy"><b>${s.title}</b><small>${i === 1 ? "BEP20 Network" : i === 0 ? "Request Received" : final && txHash ? esc(shortAddr(txHash)) : "Transaction Complete"}</small></div>
+                </div>
+                ${i < 2 ? `<div class="step-line ${complete ? "complete" : ""}"><span></span></div>` : ""}
+              `;
+            }).join("")}
           </div>
 
-          <div class="receipt-destination">
-            <span>Destination</span>
-            <b>${esc(shortAddr(address))}</b>
-          </div>
+          <div class="receipt-destination"><span>Destination</span><b>${esc(shortAddr(address))}</b></div>
           ${txHash ? `<div class="receipt-tx"><span>Transaction Hash</span><b class="mono">${esc(txHash)}</b></div>` : ""}
-          ${error ? `<button class="btn ghost" id="receipt-history">Back to History</button>` : ""}
-          ${final ? `<button class="btn" id="receipt-history">Done</button>` : ""}
+          ${error ? `<button class="btn ghost" id="receipt-close-bottom">Close</button>` : ""}
+          ${final ? `<button class="btn" id="receipt-close-bottom">Close</button>` : ""}
         </div>
       </div>
-    </section>`;
+    </div>`;
 }
 
-async function showAutoReceipt(body, { amount, address, id }, go) {
-  let step = 0;
-  let finished = false;
-  let pollTimer = null;
+/**
+ * Opens a compact themed withdrawal receipt. For a fresh withdrawal it deliberately
+ * holds the first stage on screen before submitting the API request so the progress
+ * feels intentional rather than instantaneous.
+ */
+export async function showWithdrawalReceipt({ amount, address, id = null, submit = null, getGo = null }) {
+  const host = document.body;
+  const existing = host.querySelector(".withdrawal-modal-backdrop");
+  if (existing) existing.remove();
 
-  const render = (extra = {}) => {
-    body.innerHTML = receiptMarkup({ amount, address, step, ...extra });
-    const back = body.querySelector("#receipt-back");
-    if (back) back.onclick = () => go("history");
-    const history = body.querySelector("#receipt-history");
-    if (history) history.onclick = () => go("history");
+  let step = 0;
+  let final = false;
+  let error = null;
+  let txHash = null;
+  let closed = false;
+  let pollTimer = null;
+  let currentId = id;
+  let firstStage = true;
+
+  const close = () => {
+    closed = true;
+    if (pollTimer) clearInterval(pollTimer);
+    const modal = host.querySelector(".withdrawal-modal-backdrop");
+    if (modal) modal.remove();
   };
 
-  // Stage 1: request is being submitted.
+  const render = () => {
+    if (closed) return;
+    const old = host.querySelector(".withdrawal-modal-backdrop");
+    if (old) old.remove();
+    host.insertAdjacentHTML("beforeend", receiptMarkup({ amount, address, step, final, txHash, error, closed }));
+    const root = host.querySelector(".withdrawal-modal-backdrop");
+    root.querySelector("#receipt-back")?.addEventListener("click", close);
+    root.querySelector("#receipt-close")?.addEventListener("click", close);
+    root.querySelector("#receipt-close-bottom")?.addEventListener("click", close);
+  };
+
   render();
 
-  // Give the first state a visible moment, then move to BEP20 confirmation.
-  await new Promise(resolve => setTimeout(resolve, 900));
-  if (finished) return;
+  // History opens should immediately show the current server state; new withdrawals get
+  // a short, visible "Sending Request" stage before the actual request is sent.
+  if (!currentId && submit) {
+    await sleep(1250);
+    if (closed) return;
+    try {
+      const r = await submit();
+      currentId = r.id;
+      if (!r.auto) {
+        error = "This withdrawal is waiting for admin processing.";
+        render();
+        return;
+      }
+    } catch (err) {
+      error = err?.message || "We couldn't submit the withdrawal request.";
+      render();
+      return;
+    }
+  }
+
+  if (!currentId) return;
+
   step = 1;
   render();
 
   const poll = async () => {
-    if (finished) return;
+    if (closed || final || error) return;
     try {
-      const s = await api.getWithdrawalStatus(id);
+      const s = await api.getWithdrawalStatus(currentId);
       if (s.status === "paid" && s.payout_state === "done") {
-        finished = true;
-        if (pollTimer) clearInterval(pollTimer);
+        final = true;
         step = 2;
+        txHash = s.tx_hash || null;
+        if (pollTimer) clearInterval(pollTimer);
         haptic("success");
-        render({ final: true, txHash: s.tx_hash });
+        render();
         return;
       }
       if (s.status === "rejected") {
-        finished = true;
+        error = s.note || "The payout could not be completed. The amount has been returned to your balance.";
         if (pollTimer) clearInterval(pollTimer);
         haptic("error");
-        render({ error: s.note || "The payout could not be completed. The amount has been returned to your balance." });
+        render();
         return;
       }
-      // The server keeps funds reserved for manual/review cases. Do not pretend they succeeded.
       if (s.payout_state === "manual" || s.payout_state === "review") {
-        finished = true;
+        error = s.note || "Your payout is still being processed. Please check History later.";
         if (pollTimer) clearInterval(pollTimer);
-        render({ error: s.note || "Your payout is still being processed. Please check History later." });
+        render();
       }
-    } catch (err) {
-      // Keep polling; a temporary connection problem must not be shown as a failed payout.
+    } catch (_) {
+      // Keep polling. A temporary connection issue must not be treated as a failed payout.
     }
   };
 
+  await sleep(700);
   await poll();
-  if (!finished) pollTimer = setInterval(poll, 1500);
+  if (!closed && !final && !error) pollTimer = setInterval(poll, 1500);
+}
+
+// Backwards-compatible wrapper used by older code paths.
+async function showAutoReceipt(body, payload, go) {
+  return showWithdrawalReceipt(payload);
 }
 
 export default {
@@ -146,9 +198,7 @@ export default {
       </section>`;
     const body = el.querySelector("#body");
 
-    if (!connected) {
-      return walletForm(body, () => go("withdrawal"));
-    }
+    if (!connected) return walletForm(body, () => go("withdrawal"));
 
     body.innerHTML = `
       <div class="card">
@@ -178,11 +228,15 @@ export default {
 
       btn.disabled = true;
       try {
-        const r = await api.requestWithdrawal({ amount });
-        if (r.auto && r.id) {
-          await showAutoReceipt(body, { amount, address: me.wallet_address, id: r.id }, go);
+        if (me.auto_payout) {
+          await showWithdrawalReceipt({
+            amount,
+            address: me.wallet_address,
+            submit: () => api.requestWithdrawal({ amount })
+          });
           return;
         }
+        const r = await api.requestWithdrawal({ amount });
         haptic("success");
         notify("Withdrawal requested. Track the request status in History.");
         go("history");

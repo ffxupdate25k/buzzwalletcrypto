@@ -39,7 +39,13 @@ router.get('/me', wrap(async (req, res) => {
 
 router.get('/history', wrap(async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT title, amount, status, type, created_at AS date FROM transactions WHERE user_id = $1 ORDER BY id DESC LIMIT 100',
+    `SELECT t.title, t.amount, t.status, t.type, t.created_at AS date,
+            w.id AS withdrawal_id, w.address AS withdrawal_address, w.tx_hash AS withdrawal_tx_hash,
+            w.payout_state AS withdrawal_payout_state, w.note AS withdrawal_note
+       FROM transactions t
+       LEFT JOIN withdrawals w ON w.transaction_id = t.id
+      WHERE t.user_id = $1
+      ORDER BY t.id DESC LIMIT 100`,
     [req.user.id]
   );
   res.json(rows);

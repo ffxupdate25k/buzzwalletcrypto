@@ -28,7 +28,7 @@ export function avatarHTML(user, name) {
 }
 
 export function pageTop(title, subtitle) {
-  return `<div class="top"><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div>`;
+  return `<div class="top"><button class="page-back" aria-label="Back">←</button><div class="top-copy"><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div></div>`;
 }
 
 export function statusBadge(status) {

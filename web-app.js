@@ -43,7 +43,9 @@ function boot() {
     go("home");
   }
 
-  async function go(name) {
+  const routeStack = [];
+  async function go(name, silent = false) {
+    if (!silent && currentName && currentName !== name) routeStack.push(currentName);
     currentName = name;
     const page = routes[name] || routes.home;
     app.innerHTML = `<div class="loading">Loading…</div>`;
@@ -51,6 +53,12 @@ function boot() {
     name === "home" ? backButton.hide() : backButton.show();
     try {
       await page.render(app, { go });
+      app.querySelectorAll(".page-back").forEach((b) => {
+        b.onclick = () => {
+          const prev = routeStack.pop() || "home";
+          go(prev);
+        };
+      });
     } catch (err) {
       if (err.gate) return enter(); // user left a required channel: show the gate again
       app.innerHTML = `<div class="empty">Couldn't load this page.<br>${esc(err.message)}</div>`;
@@ -83,7 +91,10 @@ function boot() {
   }
   let currentName = "home";
 
-  backButton.onClick(() => go("home"));
+  backButton.onClick(() => {
+    const prev = routeStack.pop() || "home";
+    go(prev);
+  });
   window.addEventListener("bw:gate", enter); // any page can request the gate
   enter();
   setInterval(autoRefresh, 12000);
