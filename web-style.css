@@ -55,3 +55,106 @@ input:not([type=checkbox]),textarea,select{width:100%;border:1px solid var(--lin
 .history-withdrawal{cursor:pointer}.history-withdrawal:active{background:rgba(255,255,255,.025)}.hist-tap{font-size:9px;color:#71809b;margin-top:4px}
 .page-back{position:absolute;left:15px;top:16px;width:40px;height:40px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.045);color:#eef2ff;font-size:25px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2}.top{position:relative;padding-left:66px}.top-copy{min-height:43px;display:flex;flex-direction:column;justify-content:center}
 @media(max-width:360px){.withdrawal-modal{width:94vw;border-radius:23px}.withdrawal-modal-content{padding:15px 11px}.withdraw-step{flex-basis:76px}.step-line{min-width:30px;margin-left:1px;margin-right:1px}.step-copy b{font-size:9px}.receipt-amount{font-size:27px}}
+
+
+/* ==========================================================
+   BUZZ WALLET HONEY THEME — inspired by the new bee artwork
+   ========================================================== */
+:root{
+  --bg:#160b05; --bg2:#2a1307; --surface:rgba(43,22,9,.92); --surface2:#321707;
+  --line:rgba(255,184,64,.16); --text:#fff8e8; --muted:#bcae98;
+  --accent:#ffb51b; --accent2:#f47a0b; --gold:#ffc52b; --ok:#35d28a; --warn:#ffc52b; --err:#ff667d;
+  --shadow:0 18px 50px rgba(0,0,0,.38);
+}
+body{
+  background:
+    radial-gradient(circle at 50% -12%,rgba(255,176,28,.20),transparent 31%),
+    radial-gradient(circle at 8% 30%,rgba(176,73,8,.18),transparent 30%),
+    linear-gradient(180deg,#120803 0%,#1d0b04 48%,#100603 100%);
+}
+body:before{
+  background-image:
+    linear-gradient(rgba(255,179,44,.045) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,179,44,.045) 1px,transparent 1px);
+  background-size:34px 34px;
+}
+.page{background:linear-gradient(180deg,rgba(40,17,6,.10),rgba(12,5,2,.22));}
+.page:after{
+  content:"";position:absolute;right:-22px;bottom:8px;width:190px;height:108px;
+  background:url('hive-bees-decor.png') center top/cover no-repeat;
+  opacity:.20;filter:saturate(1.25) contrast(1.05);pointer-events:none;z-index:0;border-radius:22px;
+  mix-blend-mode:screen;
+}
+.page > *{position:relative;z-index:1}
+.hero{
+  padding:22px 18px 86px;
+  background:
+    radial-gradient(circle at 72% 35%,rgba(255,187,36,.20),transparent 26%),
+    linear-gradient(145deg,#3a1807 0%,#241006 55%,#140803 100%);
+  border-bottom:1px solid rgba(255,193,61,.18);
+}
+.hero:before{width:240px;height:240px;right:-100px;top:-110px;background:radial-gradient(circle,rgba(255,177,27,.26),transparent 68%)}
+.hero:after{width:210px;height:210px;left:-120px;bottom:-145px;background:radial-gradient(circle,rgba(255,119,8,.17),transparent 70%)}
+.user b{color:#fff8e8}.user small{color:#d2b995}.avatar{background:linear-gradient(135deg,#ffca3a,#e56d08);border-color:rgba(255,215,115,.32);box-shadow:0 10px 28px rgba(255,135,13,.20)}
+.bee-tag{display:block;color:#e9c98f;font-size:10px;font-style:normal;margin-top:5px;font-weight:700}
+.dashboard-hive-art{position:absolute;right:-30px;top:-6px;width:190px;height:128px;overflow:hidden;border-radius:0 0 0 80px;opacity:.55;pointer-events:none;filter:saturate(1.1)}
+.dashboard-hive-art img{width:310px;height:auto;position:absolute;right:-45px;top:-2px}
+.balance{margin:-50px 16px 0;padding:20px;border-color:rgba(255,199,77,.24);background:linear-gradient(135deg,rgba(164,76,7,.98),rgba(91,35,5,.97));box-shadow:0 18px 42px rgba(83,34,5,.48)}
+.balance:before{border-color:rgba(255,214,100,.18);box-shadow:0 0 0 28px rgba(255,200,70,.03),0 0 0 58px rgba(255,200,70,.02)}
+.balance .amt{color:#fff7d7;text-shadow:0 2px 20px rgba(255,179,23,.20)}
+.chip{background:rgba(26,10,2,.35);border-color:rgba(255,211,106,.20)}
+.grid{padding-top:18px}
+.tile,.card{
+  background:linear-gradient(145deg,rgba(55,25,8,.95),rgba(27,12,4,.95));
+  border-color:rgba(255,190,66,.14);
+}
+.tile:hover{border-color:rgba(255,194,60,.42)}
+.tile .ic{background:linear-gradient(135deg,#e99a11,#8f3c05);border-color:rgba(255,210,100,.18);box-shadow:0 9px 20px rgba(96,36,3,.34)}
+.tile.admin{background:linear-gradient(135deg,rgba(255,193,56,.12),rgba(130,51,6,.18));border-color:rgba(255,200,72,.25)}
+.tile.admin .ic{background:linear-gradient(135deg,#ffc32e,#b55308)}
+.top,.gate-hero{background:linear-gradient(145deg,#3a1807,#1b0b04);border-bottom-color:rgba(255,193,61,.18)}
+.top{box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.card{box-shadow:0 18px 48px rgba(0,0,0,.28)}
+.btn{background:linear-gradient(135deg,#ffc62e,#d96a08);box-shadow:0 10px 24px rgba(205,93,8,.25);border-color:rgba(255,218,116,.20)}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:rgba(255,189,49,.055);color:#f7e5bf;border-color:rgba(255,195,75,.14)}
+.btn.danger{background:rgba(255,102,125,.10)}
+input:not([type=checkbox]),textarea,select{background:rgba(17,7,2,.78);border-color:rgba(255,188,59,.14)}
+input:focus,textarea:focus,select:focus{border-color:rgba(255,193,52,.72);box-shadow:0 0 0 3px rgba(255,178,28,.12)}
+label{color:#cdb998}.link{background:rgba(255,178,28,.055);border-color:rgba(255,188,54,.16);color:#f0d9ae}
+.tabs .tab{border-color:rgba(255,190,60,.14);background:rgba(255,187,39,.04)}
+.tabs .tab.on{background:linear-gradient(135deg,#ffc42c,#d96a08);box-shadow:0 7px 18px rgba(191,77,4,.25)}
+.badge.b-ok{background:rgba(53,210,138,.11)}
+
+/* Branded startup screen */
+#boot-loader{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:
+  radial-gradient(circle at 50% 38%,rgba(255,183,31,.18),transparent 28%),
+  linear-gradient(160deg,#120803,#2a1104 58%,#100502);color:#fff8e8;transition:opacity .22s ease,visibility .22s ease}
+#boot-loader.hide{opacity:0;visibility:hidden;pointer-events:none}
+.boot-hive{width:82px;height:82px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:48px;background:radial-gradient(circle,#5b2706,#241006);border:1px solid rgba(255,205,91,.35);box-shadow:0 0 0 8px rgba(255,184,35,.04),0 18px 50px rgba(255,148,11,.22);animation:bootBee 1.1s ease-in-out infinite}
+.boot-brand{margin-top:18px;font-size:30px;font-weight:950;letter-spacing:1px;color:#ffc52b;text-shadow:0 4px 22px rgba(255,174,22,.25)}
+.boot-brand span{color:#fff4df}
+.boot-sub{margin-top:8px;color:#c9b28e;font-size:13px;font-weight:700;letter-spacing:.25px}
+.boot-progress{width:min(260px,72vw);height:5px;margin-top:22px;border-radius:99px;background:rgba(255,255,255,.10);overflow:hidden;box-shadow:0 0 0 1px rgba(255,194,57,.08)}
+.boot-progress span{display:block;width:0;height:100%;border-radius:99px;background:linear-gradient(90deg,#b95b05,#ffc62e,#fff1a1,#ffc62e);box-shadow:0 0 14px rgba(255,194,46,.9);animation:bootProgress 1.55s cubic-bezier(.2,.75,.25,1) forwards}
+.boot-progress span:after{content:"";display:block;width:38px;height:100%;margin-left:auto;background:linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent);filter:blur(2px);animation:bootShine .8s linear infinite}
+@keyframes bootProgress{0%{width:0}100%{width:100%}}
+@keyframes bootShine{from{transform:translateX(-45px)}to{transform:translateX(45px)}}
+@keyframes bootBee{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-7px) rotate(2deg)}}
+
+/* Make the withdrawal receipt use the same honey palette */
+.withdrawal-modal-backdrop{background:rgba(19,7,2,.70);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.withdrawal-modal{background:linear-gradient(155deg,rgba(58,27,8,.98),rgba(23,9,3,.99));border-color:rgba(255,195,62,.18);box-shadow:0 28px 90px rgba(0,0,0,.62),0 0 0 1px rgba(255,175,22,.05)}
+.withdrawal-modal-head{border-bottom-color:rgba(255,190,56,.12)}
+.withdrawal-modal-back,.withdrawal-modal-x{background:rgba(255,193,51,.055);color:#fff0ce}
+.receipt-status.pending{background:rgba(255,188,38,.11);color:#ffd86a}
+.step-line{background:rgba(255,220,125,.10)}
+.step-line span{background:linear-gradient(90deg,#e38b0a,#ffc52b,#fff09a)}
+.receipt-destination,.receipt-tx{background:rgba(255,190,55,.035);border-color:rgba(255,190,55,.10)}
+.withdrawal-modal .btn:not(.ghost){background:linear-gradient(135deg,#ffc52d,#d96b08);box-shadow:0 10px 24px rgba(209,99,8,.20)}
+
+@media(max-width:480px){
+  .dashboard-hive-art{width:155px;height:108px;right:-22px;opacity:.46}
+  .dashboard-hive-art img{width:270px;right:-42px}
+  .boot-brand{font-size:27px}
+}

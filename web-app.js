@@ -15,14 +15,22 @@ import admin      from "./web-page-admin.js";
 const routes = { home: dashboard, profile, history, referral, task, withdrawal, admin };
 
 if (!isTelegram()) {
+  const loader = document.getElementById("boot-loader");
+  if (loader) loader.classList.add("hide");
   document.getElementById("blocked").hidden = false;
 } else {
   boot();
 }
 
-function boot() {
+async function boot() {
   initTelegram();
   const app = document.getElementById("app");
+  const loader = document.getElementById("boot-loader");
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  // Give the branded loader time to complete its sweep before revealing the app.
+  await wait(1650);
+  if (loader) loader.classList.add("hide");
+  await wait(220);
   app.hidden = false;
 
   function showError(err) {

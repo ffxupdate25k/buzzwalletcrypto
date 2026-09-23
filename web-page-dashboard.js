@@ -20,9 +20,12 @@ export default {
     el.innerHTML = `
       <section class="page">
         <div class="hero">
+          <div class="dashboard-hive-art" aria-hidden="true">
+            <img src="hive-bees-decor.png" alt="">
+          </div>
           <div class="user">
             <div class="avatar">${avatarHTML(getUser(), name)}</div>
-            <div><small>Welcome back</small><b>${esc(name)}</b></div>
+            <div><small>Welcome back</small><b>${esc(name)}</b><em class="bee-tag">🐝 Honey secured</em></div>
           </div>
         </div>
         <div class="balance">
