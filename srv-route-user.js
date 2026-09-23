@@ -52,13 +52,13 @@ router.get('/history', wrap(async (req, res) => {
 }));
 
 router.get('/recent-payouts', wrap(async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT amount, created_at AS date
-       FROM withdrawals
-      WHERE status = 'paid'
-      ORDER BY processed_at DESC NULLS LAST, id DESC
-      LIMIT 12`
-  );
+  const { rows } = await pool.query(`
+    SELECT amount, created_at AS date
+      FROM withdrawals
+     WHERE status = 'paid'
+     ORDER BY processed_at DESC NULLS LAST, id DESC
+     LIMIT 8
+  `);
   res.json(rows.map((r) => ({ amount: Number(r.amount), date: r.date })));
 }));
 

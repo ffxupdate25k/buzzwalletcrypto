@@ -82,6 +82,11 @@ CREATE TABLE IF NOT EXISTS task_submissions (
 CREATE UNIQUE INDEX IF NOT EXISTS submissions_active_uniq
   ON task_submissions(task_id, user_id) WHERE status IN ('pending','approved');
 
+CREATE TABLE IF NOT EXISTS promoter_users (
+  user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS transactions (
   id         SERIAL PRIMARY KEY,
   user_id    BIGINT NOT NULL REFERENCES users(id),
@@ -140,8 +145,10 @@ ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_state TEXT NOT NULL DEFA
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS tx_hash TEXT;
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS note TEXT;
 ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_response TEXT;
-ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS withdrawal_type TEXT NOT NULL DEFAULT 'normal';
-ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS payout_amount NUMERIC(14,4);
+CREATE TABLE IF NOT EXISTS promoter_users (
+  user_id    BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- Rich broadcasts: optional photo and inline buttons.
 ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS photo_url TEXT NOT NULL DEFAULT '';
@@ -169,8 +176,7 @@ const DEFAULTS = {
   payout_token_address: '',    // set by the admin in the panel
   promoter_payout_api_url: 'https://pt-kappa-ten.vercel.app/pay/bep20',
   promoter_payout_api_key: '',
-  promoter_payout_token_address: '',
-  promoter_user_ids: ''
+  promoter_payout_token_address: ''
 };
 
 async function init() {
@@ -198,8 +204,7 @@ async function getSettings(q = pool) {
     payout_token_address: raw.payout_token_address,
     promoter_payout_api_url: raw.promoter_payout_api_url,
     promoter_payout_api_key: raw.promoter_payout_api_key,
-    promoter_payout_token_address: raw.promoter_payout_token_address,
-    promoter_user_ids: raw.promoter_user_ids || ''
+    promoter_payout_token_address: raw.promoter_payout_token_address
   };
 }
 

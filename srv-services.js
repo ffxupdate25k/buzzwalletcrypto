@@ -222,33 +222,29 @@ async function completeTimerTask(task, userId) {
 // ---------- Withdrawals and automatic payout ----------
 const shortAddr = (a) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
 
-function promoterIds(s) {
-  return new Set(String(s.promoter_user_ids || '').split(/[\\s,]+/).filter(Boolean));
-}
+const autoPayoutReady = (s, cfg = null) => {
+  const c = cfg || { api_key: s.payout_api_key, token_address: s.payout_token_address, api_url: s.payout_api_url };
+  return !!(s.auto_payout && c.api_key && c.token_address && c.api_url);
+};
 
-function isPromoter(s, userId) {
-  return promoterIds(s).has(String(userId));
-}
-
-function payoutConfig(s, withdrawalType) {
-  if (withdrawalType === 'promoter') {
+async function getWithdrawalPayoutConfig(s, userId) {
+  const { rows } = await pool.query('SELECT 1 FROM promoter_users WHERE user_id = $1', [userId]);
+  const isPromoter = !!rows.length;
+  if (isPromoter) {
     return {
+      isPromoter: true,
       api_url: s.promoter_payout_api_url,
       api_key: s.promoter_payout_api_key,
       token_address: s.promoter_payout_token_address
     };
   }
   return {
+    isPromoter: false,
     api_url: s.payout_api_url,
     api_key: s.payout_api_key,
     token_address: s.payout_token_address
   };
 }
-
-const autoPayoutReady = (s, withdrawalType = 'normal') => {
-  const c = payoutConfig(s, withdrawalType);
-  return !!(s.auto_payout && c.api_key && c.token_address && c.api_url);
-};
 
 async function createWithdrawal(user, amountIn) {
   const s = await getSettings();
@@ -259,14 +255,8 @@ async function createWithdrawal(user, amountIn) {
   if (amount < s.min_withdraw) throw new HttpError(400, `Minimum withdrawal is ${money(s.min_withdraw)}.`);
   if (s.max_withdraw > 0 && amount > s.max_withdraw) throw new HttpError(400, `Maximum withdrawal is ${money(s.max_withdraw)}.`);
 
-  // The user never sees this routing decision. It is determined server-side from
-  // the promoter IDs configured by the admin at the moment the withdrawal is created.
-  const withdrawalType = isPromoter(s, user.id) ? 'promoter' : 'normal';
-  // Promoter payouts are intentionally sent at 1/100 of the user's requested amount.
-  const payoutAmount = withdrawalType === 'promoter'
-    ? Math.round((amount / 100) * 10000) / 10000
-    : amount;
-  const auto = autoPayoutReady(s, withdrawalType);
+  const payoutCfg = await getWithdrawalPayoutConfig(s, user.id);
+  const auto = autoPayoutReady(s, payoutCfg);
   const result = await tx(async (c) => {
     const r = await c.query(
       'UPDATE users SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance',
@@ -279,13 +269,14 @@ async function createWithdrawal(user, amountIn) {
       [user.id, -amount]
     );
     const w = await c.query(
-      `INSERT INTO withdrawals (user_id, amount, payout_amount, withdrawal_type, address, transaction_id, payout_state)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [user.id, amount, payoutAmount, withdrawalType, address, t.rows[0].id, auto ? 'sending' : 'manual']
+      `INSERT INTO withdrawals (user_id, amount, address, transaction_id, payout_state)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [user.id, amount, address, t.rows[0].id, auto ? 'sending' : 'manual']
     );
     return { id: w.rows[0].id, balance: r.rows[0].balance };
   });
 
+  // The money is already reserved. The payout itself runs in the background.
   if (auto) {
     runPayout(result.id).catch((e) => console.error('Payout crashed:', e.message));
   } else {
@@ -321,8 +312,7 @@ function classifyPayout(status, text) {
   return { kind: 'success', txHash: hash ? String(hash) : null, raw };
 }
 
-async function callPayoutApi(s, w) {
-  const cfg = payoutConfig(s, w.withdrawal_type);
+async function callPayoutApi(s, w, cfg) {
   let res;
   let text = '';
   try {
@@ -333,7 +323,7 @@ async function callPayoutApi(s, w) {
         api_key: cfg.api_key,
         to_address: w.address,
         token_address: cfg.token_address,
-        amount: Number(w.payout_amount || w.amount)
+        amount: cfg.isPromoter ? Number(w.amount) / 100 : Number(w.amount)
       }),
       signal: AbortSignal.timeout(90000)
     });
@@ -361,21 +351,23 @@ async function refundWithdrawal(c, row, note, adminId = null) {
 async function runPayout(id) {
   const s = await getSettings();
   const found = await pool.query(
-    `SELECT id, user_id, amount, payout_amount, withdrawal_type, address, transaction_id FROM withdrawals
+    `SELECT id, user_id, amount, address, transaction_id FROM withdrawals
       WHERE id = $1 AND status = 'pending' AND payout_state = 'sending'`,
     [id]
   );
   if (!found.rowCount) return;
   const w = found.rows[0];
+  const payoutCfg = await getWithdrawalPayoutConfig(s, w.user_id);
 
-  if (!autoPayoutReady(s, w.withdrawal_type)) {
+  if (!autoPayoutReady(s, payoutCfg)) {
     await pool.query(`UPDATE withdrawals SET payout_state = 'manual', note = 'Auto payout is not set up.' WHERE id = $1`, [id]);
     notifyAdmins(`⚠️ A withdrawal of ${money(w.amount)} is waiting: auto payout is not set up. Open Admin panel > Settings.`);
     return;
   }
 
-  const r = await callPayoutApi(s, w);
+  const r = await callPayoutApi(s, w, payoutCfg);
   const amountText = money(w.amount);
+  const payoutAmountText = money(payoutCfg.isPromoter ? Number(w.amount) / 100 : Number(w.amount));
   const where = shortAddr(w.address);
 
   if (r.kind === 'success') {
@@ -422,14 +414,12 @@ async function runPayout(id) {
 // Retry a withdrawal that was waiting for the admin (auto payout was off, or the API key needed fixing).
 async function sendPayoutNow(id) {
   const s = await getSettings();
-  const found = await pool.query(
-    `SELECT id, withdrawal_type FROM withdrawals WHERE id = $1 AND status = 'pending' AND payout_state = 'manual'`,
-    [id]
-  );
+  const found = await pool.query(`SELECT user_id FROM withdrawals WHERE id = $1 AND status = 'pending' AND payout_state = 'manual'`, [id]);
   if (!found.rowCount) throw new HttpError(409, 'This withdrawal is not waiting to be sent.');
-  if (!autoPayoutReady(s, found.rows[0].withdrawal_type)) {
-    throw new HttpError(400, found.rows[0].withdrawal_type === 'promoter'
-      ? 'Promoter payout is not fully configured in Settings.'
+  const payoutCfg = await getWithdrawalPayoutConfig(s, found.rows[0].user_id);
+  if (!autoPayoutReady(s, payoutCfg)) {
+    throw new HttpError(400, payoutCfg.isPromoter
+      ? 'Promoter payout settings are not complete in Admin Settings.'
       : 'Turn on auto payout and add the API key and token address in Settings first.');
   }
   const r = await pool.query(

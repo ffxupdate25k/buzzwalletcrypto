@@ -18,11 +18,31 @@ export default {
           </div>
           <div class="hint">${u.username ? "@" + esc(u.username) + " · " : ""}ID ${esc(u.id)} · ${u.referrals} referrals</div>
           <div class="hint">Wallet: ${u.wallet_address ? esc(shortAddr(u.wallet_address)) : "not saved"} · Joined ${esc(fmtDate(u.created_at))}</div>
+          <div class="acts"><button class="btn sm ${u.is_promoter ? "danger" : "ghost"}" data-promoter="${u.id}">${u.is_promoter ? "Remove promoter" : "Make promoter"}</button></div>
           <div class="acts"><button class="btn sm ghost" data-id="${u.id}">Open</button></div>
         </div>`).join("") : `<div class="card empty">No users found.</div>`;
 
       box.querySelectorAll("[data-id]").forEach((b) => {
         b.onclick = () => showUser(list.find((u) => String(u.id) === b.dataset.id));
+      });
+      box.querySelectorAll("[data-promoter]").forEach((b) => {
+        b.onclick = async () => {
+          b.disabled = true;
+          try {
+            const u = list.find((x) => String(x.id) === b.dataset.promoter);
+            if (u?.is_promoter) {
+              await api.admin.removePromoter(u.id);
+              u.is_promoter = false;
+              notify("Promoter status removed.");
+            } else {
+              await api.admin.setPromoter(b.dataset.promoter);
+              if (u) u.is_promoter = true;
+              notify("User is now a promoter.");
+            }
+            haptic("success");
+            await search(lastQuery);
+          } catch (err) { b.disabled = false; fail(err); }
+        };
       });
     }
 
@@ -31,7 +51,7 @@ export default {
       el.innerHTML = `
         <div class="card">
           <b>${esc(u.name)}</b>
-          <div class="hint">${u.username ? "@" + esc(u.username) + " · " : ""}ID ${esc(u.id)}</div>
+          <div class="hint">${u.username ? "@" + esc(u.username) + " · " : ""}ID ${esc(u.id)}${u.is_promoter ? " · <b style=\"color:var(--warn)\">PROMOTER</b>" : ""}</div>
           <div class="row"><span class="l">Balance</span><span class="r" id="bal">${money(balance)}</span></div>
           <div class="row"><span class="l">Wallet</span><span class="r mono" style="font-size:12px">${u.wallet_address ? esc(u.wallet_address) : "Not saved"}</span></div>
           ${u.wallet_address ? `<div class="acts" style="margin-top:0"><button class="btn sm danger" id="reset">Reset wallet</button></div><p class="hint">Resetting lets this user save a different wallet.</p>` : ""}

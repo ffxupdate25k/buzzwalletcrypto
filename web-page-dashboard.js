@@ -15,7 +15,8 @@ export default {
   async render(el, { go }) {
     const me = await api.getMe();
     const name = getDisplayName();
-    const recentPayouts = await api.getRecentPayouts().catch(() => []);
+    let recentPayouts = [];
+    try { recentPayouts = await api.getRecentPayouts(); } catch (_) { recentPayouts = []; }
     const buttons = me.is_admin ? [...BUTTONS, { go: "admin", label: "Admin panel", wide: true, admin: true }] : BUTTONS;
 
     el.innerHTML = `
@@ -33,17 +34,6 @@ export default {
           <div><small>Your balance</small><div class="amt">${money(me.balance)}</div></div>
           <div class="chip">${me.referrals} referrals</div>
         </div>
-        ${recentPayouts.length ? `
-        <div class="card recent-payouts">
-          <div class="section-title">Recent payouts</div>
-          <div class="payout-feed">
-            ${recentPayouts.map((p) => `
-              <div class="payout-item">
-                <span class="payout-dot">✓</span>
-                <div><b>User just withdrew ${money(p.amount)}</b><small>${new Date(p.date).toLocaleString()}</small></div>
-              </div>`).join("")}
-          </div>
-        </div>` : ""}
         <div class="grid">
           ${buttons.map((b) => `
             <button class="tile${b.wide ? " wide" : ""}${b.admin ? " admin" : ""}" data-go="${b.go}">
@@ -55,5 +45,37 @@ export default {
     el.querySelectorAll("[data-go]").forEach((btn) =>
       btn.addEventListener("click", () => { tap(); go(btn.dataset.go); })
     );
+
+    // Show recent payouts as short, one-at-a-time popups instead of a long list.
+    if (recentPayouts.length) {
+      const popup = document.createElement("div");
+      popup.className = "recent-payout-popup";
+      popup.setAttribute("aria-live", "polite");
+      document.body.appendChild(popup);
+
+      let index = 0;
+      let timer;
+      const showNext = () => {
+        const p = recentPayouts[index % recentPayouts.length];
+        index++;
+        popup.classList.remove("show");
+        window.setTimeout(() => {
+          popup.innerHTML = `<span class="recent-payout-dot">✓</span><span>User just withdrew <b>${money(p.amount)}</b></span>`;
+          popup.classList.add("show");
+        }, 180);
+      };
+      showNext();
+      timer = window.setInterval(showNext, 3600);
+
+      // Stop the cycle when this dashboard view is replaced.
+      const observer = new MutationObserver(() => {
+        if (!document.body.contains(el)) {
+          window.clearInterval(timer);
+          popup.remove();
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   }
 };

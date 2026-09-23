@@ -39,7 +39,7 @@ function publicSettings(s) {
     ...rest,
     has_api_key: !!payout_api_key,
     api_key_hint: payout_api_key ? payout_api_key.slice(0, 4) + '…' + payout_api_key.slice(-4) : '',
-    promoter_has_api_key: !!promoter_payout_api_key,
+    has_promoter_api_key: !!promoter_payout_api_key,
     promoter_api_key_hint: promoter_payout_api_key ? promoter_payout_api_key.slice(0, 4) + '…' + promoter_payout_api_key.slice(-4) : ''
   };
 }
@@ -85,6 +85,9 @@ router.put('/settings', wrap(async (req, res) => {
   if (newKey && (newKey.length < 8 || newKey.length > 300 || /\s/.test(newKey))) {
     throw new HttpError(400, 'That API key does not look right.');
   }
+  if (auto_payout && !(newKey || cur.payout_api_key)) throw new HttpError(400, 'Add the payout API key before turning on auto payout.');
+  if (auto_payout && !payout_token_address) throw new HttpError(400, 'Add the token address before turning on auto payout.');
+
   const promoter_payout_api_url = String(b.promoter_payout_api_url || '').trim();
   if (!/^https:\/\/\S+$/i.test(promoter_payout_api_url)) throw new HttpError(400, 'The promoter payout API address must start with https://');
   const promoter_payout_token_address = String(b.promoter_payout_token_address || '').trim();
@@ -95,25 +98,11 @@ router.put('/settings', wrap(async (req, res) => {
   if (newPromoterKey && (newPromoterKey.length < 8 || newPromoterKey.length > 300 || /\s/.test(newPromoterKey))) {
     throw new HttpError(400, 'That promoter API key does not look right.');
   }
-  const promoter_user_ids = String(b.promoter_user_ids || '').trim();
-  if (promoter_user_ids) {
-    const ids = promoter_user_ids.split(/[\s,]+/).filter(Boolean);
-    if (ids.length > 10000 || ids.some((id) => !/^\d{1,20}$/.test(id))) {
-      throw new HttpError(400, 'Promoter user IDs must be numeric Telegram user IDs separated by commas or spaces.');
-    }
-  }
-  if (auto_payout && !(newKey || cur.payout_api_key)) throw new HttpError(400, 'Add the payout API key before turning on auto payout.');
-  if (auto_payout && !payout_token_address) throw new HttpError(400, 'Add the token address before turning on auto payout.');
-  // Promoter payouts use a completely separate endpoint/key/token. They are only
-  // required when the admin has configured at least one promoter.
-  if (promoter_user_ids && (!promoter_payout_api_url || !(newPromoterKey || cur.promoter_payout_api_key) || !promoter_payout_token_address)) {
-    throw new HttpError(400, 'Configure the promoter payout API URL, API key and token address before adding promoter IDs.');
-  }
 
   const toSave = {
     referral_reward, min_withdraw, max_withdraw, welcome_text, welcome_photo_url, welcome_emoji_ids,
     auto_payout: String(auto_payout), payout_api_url, payout_token_address,
-    promoter_payout_api_url, promoter_payout_token_address, promoter_user_ids
+    promoter_payout_api_url, promoter_payout_token_address
   };
   if (newKey) toSave.payout_api_key = newKey; // leaving it empty keeps the saved key
   if (newPromoterKey) toSave.promoter_payout_api_key = newPromoterKey;
@@ -198,7 +187,7 @@ router.delete('/tasks/:id', wrap(async (req, res) => {
 router.get('/withdrawals', wrap(async (req, res) => {
   const status = ['pending', 'paid', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';
   const { rows } = await pool.query(
-    `SELECT w.id, w.amount, w.payout_amount, w.withdrawal_type, w.address, w.status, w.payout_state, w.tx_hash, w.note, w.created_at AS date,
+    `SELECT w.id, w.amount, w.address, w.status, w.payout_state, w.tx_hash, w.note, w.created_at AS date,
             u.id AS user_id, u.first_name, u.last_name, u.username
        FROM withdrawals w JOIN users u ON u.id = w.user_id
       WHERE w.status = $1 ORDER BY w.id ${status === 'pending' ? 'ASC' : 'DESC'} LIMIT 50`,
@@ -225,7 +214,8 @@ router.post('/withdrawals/:id/reject', wrap(async (req, res) => {
 // ---------- Users ----------
 const USER_SELECT = `
   SELECT u.id, u.first_name, u.last_name, u.username, u.balance, u.created_at, u.wallet_address,
-         (SELECT COUNT(*) FROM referrals r WHERE r.referrer_id = u.id AND r.status = 'completed') AS referrals
+         (SELECT COUNT(*) FROM referrals r WHERE r.referrer_id = u.id AND r.status = 'completed') AS referrals,
+         EXISTS (SELECT 1 FROM promoter_users p WHERE p.user_id = u.id) AS is_promoter
     FROM users u`;
 
 router.get('/users', wrap(async (req, res) => {
@@ -252,6 +242,31 @@ router.post('/users/:id/balance', wrap(async (req, res) => {
   }
   const balance = await svc.adjustBalance(req.params.id, amount, note);
   res.json({ balance });
+}));
+
+// ---------- Promoters ----------
+router.get('/promoters', wrap(async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT u.id, u.first_name, u.last_name, u.username, u.balance, u.wallet_address, p.created_at
+      FROM promoter_users p JOIN users u ON u.id = p.user_id
+     ORDER BY p.created_at DESC
+  `);
+  res.json(rows.map((r) => ({ ...r, name: svc.displayName(r), is_promoter: true })));
+}));
+
+router.post('/promoters/:id', wrap(async (req, res) => {
+  const userId = String(req.params.id || '').trim();
+  if (!/^\d+$/.test(userId)) throw new HttpError(400, 'Enter a valid Telegram user ID.');
+  const { rows: users } = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+  if (!users.length) throw new HttpError(404, 'User not found. Ask the user to open the app first.');
+  await pool.query('INSERT INTO promoter_users (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING', [userId]);
+  res.json({ ok: true, is_promoter: true });
+}));
+
+router.delete('/promoters/:id', wrap(async (req, res) => {
+  const userId = String(req.params.id || '').trim();
+  await pool.query('DELETE FROM promoter_users WHERE user_id = $1', [userId]);
+  res.json({ ok: true, is_promoter: false });
 }));
 
 // ---------- Required channels (the join gate) ----------

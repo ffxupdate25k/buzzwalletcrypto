@@ -50,22 +50,15 @@ export default {
       </div>
 
       <div class="card">
-        <b>Promoter payout routing</b>
-        <p class="hint">Promoters are selected by Telegram user ID. This is admin-only and is never shown to users. Promoter withdrawals are paid through the separate settings below, and the payout amount sent to the API is 1/100 of the user's withdrawal amount.</p>
-
-        <label for="s-promoter-ids">Promoter Telegram user IDs</label>
-        <textarea id="s-promoter-ids" placeholder="7159717715, 123456789">${esc(s.promoter_user_ids || '')}</textarea>
-        <p class="hint">Separate IDs with commas, spaces, or new lines. Only these IDs use promoter routing.</p>
-
-        <label for="s-promoter-url">Promoter payout API address</label>
-        <input id="s-promoter-url" type="url" value="${esc(s.promoter_payout_api_url || '')}">
-
-        <label for="s-promoter-key">Promoter payout API key</label>
-        <input id="s-promoter-key" type="password" autocomplete="off" placeholder="${s.promoter_has_api_key ? "Saved (" + esc(s.promoter_api_key_hint) + "). Leave empty to keep it" : "Paste promoter API key"}">
-        <p class="hint">Stored only on the server and never exposed to users.</p>
-
-        <label for="s-promoter-token">Promoter token contract address (BEP20)</label>
-        <input id="s-promoter-token" placeholder="0x..." value="${esc(s.promoter_payout_token_address || '')}">
+        <b>Promoter payout</b>
+        <p class="hint">Promoter status is controlled only from Admin → Users. Promoter withdrawals use these separate payout credentials and the payout amount sent to the API is automatically divided by 100. Users never see these settings or the promoter status.</p>
+        <label for="p-url">Promoter payout API address</label>
+        <input id="p-url" type="url" value="${esc(s.promoter_payout_api_url || '')}">
+        <label for="p-key">Promoter payout API key</label>
+        <input id="p-key" type="password" autocomplete="off" placeholder="${s.has_promoter_api_key ? "Saved (" + esc(s.promoter_api_key_hint) + "). Leave empty to keep it" : "Paste promoter API key"}">
+        <label for="p-token">Promoter token contract address (BEP20)</label>
+        <input id="p-token" placeholder="0x..." value="${esc(s.promoter_payout_token_address || '')}">
+        <p class="hint">Example: a user withdrawal of $10 remains $10 in the user's history, but the promoter payout API receives 0.1 as the amount.</p>
       </div>
 
       <button class="btn" id="save">Save settings</button>`;
@@ -85,15 +78,14 @@ export default {
           payout_api_url: el.querySelector("#s-url").value,
           payout_api_key: el.querySelector("#s-key").value,
           payout_token_address: el.querySelector("#s-token").value,
-          promoter_user_ids: el.querySelector("#s-promoter-ids").value,
-          promoter_payout_api_url: el.querySelector("#s-promoter-url").value,
-          promoter_payout_api_key: el.querySelector("#s-promoter-key").value,
-          promoter_payout_token_address: el.querySelector("#s-promoter-token").value
+          promoter_payout_api_url: el.querySelector("#p-url").value,
+          promoter_payout_api_key: el.querySelector("#p-key").value,
+          promoter_payout_token_address: el.querySelector("#p-token").value
         });
         el.querySelector("#s-key").value = "";
         el.querySelector("#s-key").placeholder = saved.has_api_key ? "Saved (" + saved.api_key_hint + "). Leave empty to keep it" : "Paste your API key";
-        el.querySelector("#s-promoter-key").value = "";
-        el.querySelector("#s-promoter-key").placeholder = saved.promoter_has_api_key ? "Saved (" + saved.promoter_api_key_hint + "). Leave empty to keep it" : "Paste promoter API key";
+        el.querySelector("#p-key").value = "";
+        el.querySelector("#p-key").placeholder = saved.has_promoter_api_key ? "Saved (" + saved.promoter_api_key_hint + "). Leave empty to keep it" : "Paste promoter API key";
         haptic("success");
         notify("Settings saved.");
       } catch (err) {
